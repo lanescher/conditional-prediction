@@ -1,0 +1,718 @@
+---
+title: "allfish_conditional"
+author: "Sarah Roberts"
+date: "2/2/2022"
+output: html_document
+---
+
+holdout one species at a time and conditionally predict based on env. and all other species.
+
+given xdata_test, xdata_train, ydata_test, ydata_train and the models (out_train_CPUEfall and out_full_CPUEfall)
+
+When I updated my R and my mac to mojave, gjam predictions were really bad for all of the below examples. Before I updated, predictions were not all 0. 
+
+#packages
+```{r}
+library(gjam)
+library(tidyverse)
+library(ggthemes)
+library(ggpubr)
+library(ggplot2)
+library(pROC)
+library(gridExtra)
+library(sf)
+```
+#functions 
+```{r}
+r2_general <-function(preds,actual){ 
+  return(1- sum((preds - actual) ^ 2)/sum((actual - mean(actual))^2))
+}
+
+RMSE_func <- function(preds, actual){
+  return(sqrt(mean((actual - preds)^2)))
+}
+
+theme_Publication <- function(base_size=12, base_family="Arial") {
+
+      (theme_foundation(base_size=base_size, base_family=base_family)
+       + theme(plot.title = element_text(face = "bold",
+                                         size = rel(1.2), hjust = 0.5),
+               text = element_text(),
+               panel.background = element_rect(colour = NA),
+               plot.background = element_rect(colour = NA),
+               panel.border = element_rect(colour = NA),
+               axis.title = element_text(face = "bold",size = rel(1)),
+               axis.title.y = element_text(angle=90,vjust =2),
+               axis.title.x = element_text(vjust = -0.2),
+               axis.text = element_text(), 
+               axis.line = element_line(colour="black"),
+               axis.ticks = element_line(),
+               panel.grid.major = element_line(colour="#f0f0f0"),
+               panel.grid.minor = element_blank(),
+               legend.key = element_rect(colour = NA),
+               legend.position = "bottom",
+               legend.direction = "horizontal",
+               legend.key.size= unit(0.5, "cm"),
+               legend.margin = unit(0, "cm"),
+               legend.title = element_text(face="italic"),
+               plot.margin=unit(c(10,5,5,5),"mm"),
+               strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+               strip.text = element_text(face="bold")
+          ))
+      
+}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+.cleanNames <- function(xx){
+  
+  xx <- gsub('-','',xx)
+  xx <- gsub('_','',xx)
+  xx <- gsub(' ','',xx)
+  xx <- gsub("'",'',xx)
+  
+  xx
+}
+
+conditionalComparison <- function( output, newdata ){
+  
+  # compare conditional prediction with unconditional prediction in output
+  
+  ydataCond <- newdata$ydataCond
+  colnames(ydataCond) <- .cleanNames( colnames(ydataCond) )
+  
+  y           <- as.matrix( output$inputs$y )
+  colnames(y) <- .cleanNames( colnames(y) )
+  
+  typeNames <- output$modelList$typeNames
+  zeroCols  <- which(typeNames %in% c('DA','CA','OC','CC'))
+  
+  x         <- output$inputs$xUnstand
+  S         <- ncol(y)
+  n         <- nrow(x)
+  if( is.null(ydataCond) )stop(' newdata must include ydataCond ' )
+  if( is.null(colnames(ydataCond)) )stop( 'ydataCond must have colnames matching ydata' )
+  
+  y0 <- y
+  y0[ y0 > 0 ] <- 1
+  percZero <- signif(1 - apply(y0, 2, sum)/nrow(y0),3)*100
+  
+  ni <- match(colnames(ydataCond), colnames(y))   # condition on these columns
+  ci <- c(1:S)[-ni]
+  if( length(ni) < ncol(ydataCond) )stop( 'ydataCond must have colnames matching ydata' )
+  
+  edata <- output$inputs$effMat
+  if( is.null(edata) )edata <- newdata$effort$values
+  if( is.null(edata) )edata <- y*0 + 1
+  wUn <- output$prediction$ypredMu/edata
+  w   <- y/edata
+  
+  preds  <- gjamPredict(output, newdata = newdata, FULL=T) 
+  condy  <- preds$sdList$yMu                                # on data scale
+  condw  <- condy/edata                                     # latent scale
+  
+  coni <- (w[,ci] - condw[,ci] )^2
+  unci <- ( w[,ci] - wUn[,ci] )^2
+  umc  <- unci - coni
+  uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
+  
+  uno <- umc
+  uno[ uno > 0 ] <- 1
+  uno[ uno <= 0 ] <- 0
+  
+  
+  if( length(ci) == 1 ){
+    con <- mean( coni  )
+    unc <- mean( unci )
+    uno <- sum(uno)/length(uno)
+  }else{ 
+    con <- diag( var( w[,ci] - condw[,ci] ) )
+    unc <- diag( var( w[,ci] - wUn[,ci] ) )
+    uno <- apply(uno, 2, sum)/nrow(umc)
+  }
+  
+  wi <- which(typeNames[ci] == 'PA')
+  if( length(wi) > 0){
+    tt <- .binaryScore(condw[,ci[wi]], y[,ci[wi]])
+    con <- tt$brierScore
+    #  ccLog   <- tt$logScore
+    
+    tt <- .binaryScore(wUn[,ci[wi]], y[,ci[wi]])
+    unc <- tt$brierScore
+    #  uuLog   <- tt$logScore
+  }
+  
+  
+  sigma <- output$parameters$sigMu
+  beta  <- output$parameters$betaMu
+  
+  C  <- solve(sigma[ni,ni])%*%sigma[ni,ci]      # check for correlation matrix
+  mu <- x%*%beta
+  
+  if(length(zeroCols) > 0){
+    mz <- mu[,zeroCols]
+    mz[ mz < 0 ] <- 0
+    mu[,zeroCols] <- mz
+  }
+  Rs <- w[,ci,drop=F] - mu[,ci,drop=F]
+  Rn <- w[,ni,drop=F] - mu[,ni,drop=F]
+  D  <- Rn%*%C
+  # z  <- -(2*t(Rs) + t(D))%*%D
+  
+  z <- ( 2*t(Rs) - t(C)%*%t(Rn) )%*%Rn%*%C
+  colnames(z) <- rownames(z)
+  
+  vmu <- var(mu[,ci])
+  vd  <- var(D)
+  cf  <- vd/(vmu + vd)      #variance fraction from conditional
+  
+  fe <- output$fit$fractionExplained
+  ynames <- colnames(fe)
+  ynames <- ynames[ ynames %in% colnames(condy)[ci] ]
+  ynames <- ynames[ !ynames == 'other' ]
+  
+  if( length(wi) == 0 ){   # not PA data
+    
+    if( length(ci) == 1 ){
+      
+      imat <- cbind( unc, con, 
+                     (unc - con)/unc*100, uno,
+                     fe[1,ynames], diag(cf), diag(z)[ynames]/n )
+    }else{
+      imat <- cbind( unc[ynames], con[ynames], 
+                     (unc - con)[ynames]/unc[ynames]*100, uno[ynames],
+                     fe[1,ynames], diag(cf)[ynames], diag(z)[ynames]/n )
+    }
+    colnames(imat) <- c("Unc MSPE", "Con MSPE", "Perc Diff", "Frac u > c",
+                        "Frac Expl", 
+                        "Frac Con", "CIS")
+  }else{  # PA data
+    
+    if( length(ci) == 1 ){
+      
+      imat <- cbind( unc, con, 
+                     (unc - con)/unc*100, uno,
+                     fe[1,ynames], diag(cf) )
+    }else{
+      imat <- cbind( unc[ynames], con[ynames], (unc - con)[ynames]/unc[ynames]*100, 
+                     uno[ynames],
+                     fe[1,ynames], diag(cf)[ynames] )
+    }
+    colnames(imat) <- c("Unc Brier", "Con Brier", "Perc Diff", "Frac u > c",
+                        "Frac Expl", 
+                        "Frac Con")
+  }
+  if(typeNames[1] != 'CON'){
+    percZero <- percZero[ynames]
+    imat <- cbind(imat, percZero)
+  }
+  if( nrow(imat) == 1)rownames(imat) <- colnames(y)[ci]
+  out1 <- list(imat, C)
+  out1
+}
+
+
+```
+
+# CPUE (counts per unit effort)
+
+# 1 out of sample 
+train on 70% and test on 30% 
+
+## 1.1 Fit model
+If you don't want to re-fit the model, the output is already saved and can be loaded in the next chunk.
+```{r}
+
+#read data 
+ytest <- read.csv("X:/conditionalPrediction/DATA/fish/ytest.csv")
+xtest <- read.csv("X:/conditionalPrediction/DATA/fish/xtest.csv")
+ytrain <- read.csv("X:/conditionalPrediction/DATA/fish/ytrain.csv")
+xtrain <- read.csv("X:/conditionalPrediction/DATA/fish/xtrain.csv")
+
+ydata <- rbind(ytrain, ytest)
+ydata <- sqrt(ydata)
+xdata <- rbind(xtrain, xtest)
+
+ynames <- colnames(ydata)
+xnames <- colnames(xdata)
+
+
+total <- cbind(ydata, xdata)
+total <- total %>% dplyr::filter(SUBREGION2 == "GulfofMaine")
+
+ydata <- total[,colnames(total) %in% ynames]
+xdata <- total[,colnames(total) %in% xnames]
+ydata <- ydata[,colSums(ydata != 0) > 150] # species with more than 150 observations
+
+ynames <- colnames(ydata)
+xnames <- colnames(xdata)
+
+smp_size <- floor(0.70 * nrow(total))
+set.seed(123)
+train_ind <- sample(seq_len(nrow(total)), size = smp_size)
+train <- total[train_ind, ]
+test <- total[-train_ind, ]
+
+ytrain <- train[,colnames(train) %in% ynames]
+xtrain <- train[,colnames(train) %in% xnames]
+ytest <- test [,colnames(test ) %in% ynames]
+xtest <- test [,colnames(test) %in% xnames]
+
+#run gjam
+
+ml <- list(ng = 20000, burnin = 8000, typeNames = 'CA')
+out <- gjam(~BT + depth + BSAL + SST + chla + SEDSIZE + month, xdata = xtrain, ydata = ytrain, modelList = ml) 
+
+save(out, file='X:/conditionalPrediction/OUT/fish-out_train_CPUE_fall.rdata')
+
+```
+
+
+## 1.2 Conditional prediction
+Conditional predict test data. Each species is conditioned on all other species
+```{r}
+load('X:/conditionalPrediction/OUT/fish-out_train_CPUE_fall.Rdata') #in case you don't want to run the full thing
+ytest <- read.csv("X:/conditionalPrediction/DATA/fish/ytest.csv")
+xtest <- read.csv("X:/conditionalPrediction/DATA/fish/xtest.csv")
+
+# only keep species that were fitted in the model
+ytest <- ytest[,which(colnames(ytest) %in% colnames(out$inputs$y))]
+
+#conditionally predict
+#holdout
+row_names <- rownames(ytest)
+col_names <- colnames(ytest)
+pred_con <- matrix(nrow = nrow(ytest), ncol = ncol(ytest), dimnames = list(row_names, col_names))
+
+pb <- txtProgressBar(0, ncol(ytest), style = 3)
+
+for(p in 1:ncol(ytest)){
+  pdex <- colnames(ytest)[p]
+  
+  #ydataCond <- select(ytest, !all_of(pdex))
+  
+  newdata <- list(xdata = xtest, ydataCond = ytest[,-p], nsim = 300) # conditionally predict out-of-sample
+
+  p6      <- gjamPredict(out, newdata = newdata)
+  pred_con[,pdex] <- p6$sdList$yMu[,p]
+  
+  setTxtProgressBar(pb, p)
+  Sys.sleep(time = 1)
+}
+
+```
+
+
+## 1.3 Traditional prediction
+Traditional predict test data.
+```{r}
+
+#traditional predict
+newdata <- list(xdata = xtest, nsim=1000)
+p7      <- gjamPredict(out, newdata = newdata)
+y_obs <- ytest♥
+y_pred <- p7[["sdList"]][["yMu"]]
+```
+
+
+## 1.4 ConditionalComparison
+
+Compare out of sample conditional and traditional. 
+This section modifies the function `conditionalComparison()` for use with out-of-sample prediction
+```{r}
+
+y_con <- pred_con
+y_uncon <- p7[["sdList"]][["yMu"]]
+
+# compare conditional prediction with unconditional prediction in output
+  
+  ydataCond <- y_con
+  colnames(ydataCond) <- .cleanNames( colnames(ydataCond) )
+  
+  y           <- ytest
+  colnames(y) <- .cleanNames( colnames(y) )
+  
+  # typeNames <- output$modelList$typeNames
+  # zeroCols  <- which(typeNames %in% c('DA','CA','OC','CC'))
+  
+  x         <- xtest
+  S         <- ncol(y)
+  n         <- nrow(x)
+  
+  y0 <- y
+  y0[ y0 > 0 ] <- 1
+  percZero <- signif(1 - apply(y0, 2, sum)/nrow(y0),3)*100
+  
+  ni <- match(colnames(ydataCond), colnames(y))   # condition on these columns
+  ci <- c(1:S)[-ni]
+  ci <- c(1:S)
+  #if( length(ni) < ncol(ydataCond) )stop( 'ydataCond must have colnames matching ydata' )
+  
+  edata <- y*0 + 1
+  wUn <- y_uncon#/edata
+  w   <- y#/edata
+  
+  #preds  <- gjamPredict(output, newdata = newdata, FULL=T) 
+  condy  <- y_con                                # on data scale
+  condw  <- condy#/edata                                     # latent scale
+  
+  coni <- (w[,ci] - condw[,ci] )^2
+  unci <- ( w[,ci] - wUn[,ci] )^2
+  umc  <- unci - coni
+  uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
+  
+  uno <- umc
+  uno[ uno > 0 ] <- 1
+  uno[ uno <= 0 ] <- 0
+  
+  
+  if( length(ci) == 1 ){
+    con <- mean( coni  )
+    unc <- mean( unci )
+    uno <- sum(uno)/length(uno)
+  }else{ 
+    con <- diag( var( w[,ci] - condw[,ci] ) )
+    unc <- diag( var( w[,ci] - wUn[,ci] ) )
+    uno <- apply(uno, 2, sum)/nrow(umc)
+  }
+  
+  
+      imat <- cbind( unc, con, 
+                     (unc - con)/unc*100, uno)
+    colnames(imat) <- c("Unc MSPE", "Con MSPE", "Perc Diff", "Frac u > c")
+
+```
+
+
+# 2 in sample
+
+## 2.1 Fit model
+
+Combine test and train data and fit model.
+```{r}
+
+#read data 
+ytest <- read.csv("X:/conditionalPrediction/DATA/fish/ytest.csv")
+xtest <- read.csv("X:/conditionalPrediction/DATA/fish/xtest.csv")
+ytrain <- read.csv("X:/conditionalPrediction/DATA/fish/ytrain.csv")
+xtrain <- read.csv("X:/conditionalPrediction/DATA/fish/xtrain.csv")
+
+ydata <- rbind(ytrain, ytest)
+ydata <- sqrt(ydata)
+xdata <- rbind(xtrain, xtest)
+
+ynames2 <- colnames(ydata)
+xnames <- colnames(xdata)
+
+
+total <- cbind(ydata, xdata)
+total <- total %>% dplyr::filter(SUBREGION2 == "GulfofMaine")
+
+ydata <- total[,colnames(total) %in% ynames]
+xdata <- total[,colnames(total) %in% xnames]
+ydata <- ydata[,colSums(ydata != 0) > 150] # I want non-zero rows 
+ynames2 <- colnames(ydata)
+#run gjam
+ml <- list(ng = 20000, burnin = 8000, typeNames = 'CA')
+out1 <- gjam(~BT + depth + BSAL + SST + chla + SEDSIZE + month, xdata = xdata, ydata = ydata, modelList = ml) 
+
+save(out1, file='X:/conditionalPrediction/OUT/out_full_CPUE_fall.Rdata')
+
+```
+
+
+
+## 2.2 ConditionalComparison
+
+```{r}
+load('out_full_CPUE_fall.Rdata') #in case you don't want to run the full thing
+
+all <- c()
+  out <- out1
+
+  ydata <- out$inputs$y
+  sp <- colnames(ydata)
+  
+  for (s in 1:length(sp)) {
+    print(paste0("Species ", s, " of ", length(sp)))
+    
+    pred <- sp[s]
+    condOn <- sp[-s]
+    
+    condOnData <- ydata[,condOn]
+    newdata <- list(ydataCond = condOnData,  nsim=200)
+    
+    # compare conditional and unconditional
+    comp <- conditionalComparison( out, newdata )
+    comp <- as.data.frame(comp[[1]])
+    
+    comp$species <- sp[s]
+    
+    all <- bind_rows(all, comp)
+    
+    
+  }
+  
+
+
+```
+
+
+#3 plot it 
+plot conditional and unconditional metrics together
+```{r}
+
+all1 <- all %>%
+  group_by(species) %>%
+  summarize(percDiffMean = mean(`Perc Diff`),
+            percDiffSe = sd(`Perc Diff`)/sqrt(n()),
+            percImprMean = mean(`Frac u > c`*100),
+            percImprSe = sd(`Frac u > c`*100)/sqrt(n())) %>%
+  pivot_longer(cols = c("percDiffMean", "percImprMean", "percDiffSe", "percImprSe")) %>%
+  mutate(type = case_when(name %in% c("percDiffMean", "percImprMean") ~ "mean",
+                          T ~ "se"),
+         metric = case_when(name %in% c("percDiffMean", "percDiffSe") ~ "percDiff",
+                            T ~ "percImpr")) %>%
+  select(!name) %>%
+  pivot_wider(names_from = type, values_from = value) 
+
+
+# 
+# p1 <- ggplot(all1) +
+#   geom_hline(yintercept = 50, color = "coral3", alpha = 0.5) +
+#   geom_hline(yintercept = 0, color = "deepskyblue", alpha = 0.5) +
+#   geom_point(aes(x = species, y = mean, color = metric)) +
+#   geom_segment(aes(x = species, xend = species, 
+#                    y = mean - se*1.96, yend = mean + se*1.6,
+#                    color = metric)) +
+#   coord_cartesian(ylim = c(0, 100), clip = "on") +
+#   scale_color_manual(#labels = c("% Improvement in RMSPE \nfrom Conditioning",
+#     #          "Fraction of Predictions\nImproved by Conditioning"),
+#     values = c("deepskyblue", "coral3"), guide = "none") +
+#   theme_bw() +
+#   theme(strip.background = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.spacing = unit(1.5, "lines"),
+#         plot.margin = margin(1,1,.5,.5, "cm")) +
+#   labs(x = "species", y = "", color = "") + theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) + theme(
+#     axis.text.x = element_blank(),
+#     axis.title.x = element_blank(),
+#     axis.ticks.x = element_blank()
+#   )+ 
+#   ggtitle('In-sample')+
+#   theme(plot.title = element_text(hjust = 0.5))+theme(plot.margin=unit(c(0,0,0,0),"mm"))+ theme(plot.title = element_text(size=10))
+
+
+imat <- as.data.frame(imat)
+imat$species <- rownames(imat)
+imat$`Frac u > c` <- imat$`Frac u > c`*100
+
+imat1 <- imat[,c("Perc Diff", "Frac u > c", "species")]
+colnames(imat1) <- c("percDiff", "percImpr", "species")
+imat1 <- imat1 %>%
+  pivot_longer(!species)
+colnames(imat1) <- c("species", "metric", "oos")
+
+colnames(all1) <- c("species", "metric", "is")
+all1 <- all1[,1:3]
+
+
+yzeros <- ydata
+yzeros[yzeros > 0] <- 1
+zeros <- as.data.frame(colMeans(yzeros))
+zeros$species <- rownames(zeros)
+colnames(zeros) <- c("abun", "species")
+
+full <- full_join(all1, imat1, by = c("species", "metric")) %>%
+  full_join(zeros, "species") %>%
+  pivot_longer(cols = c("is", "oos"))
+
+
+ggplot(full) + 
+  geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "coral3", alpha = 0.5) +
+  geom_point(aes(x = reorder(species, abun), y = value, color = metric, shape = name)) +
+  scale_color_manual(#labels = c("% Improvement in RMSPE \nfrom Conditioning",
+    #          "Fraction of Predictions\nImproved by Conditioning"),
+    values = c("coral3","deepskyblue"), guide = "none") +
+  scale_shape_manual(values = c(16, 1), guide = "none") +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.spacing = unit(1.5, "lines"),
+        plot.margin = margin(1,1,.5,.5, "cm"),
+        axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) +
+  #coord_cartesian(ylim = c(0, 100), clip = "on") +
+  labs(x = "", y = "")
+
+ggsave("metrics.jpg", height = 5, width = 6, units = c("in"))
+
+# imat1 <- imat %>% pivot_longer(cols = c("Unc MSPE", "Con MSPE", "Perc Diff", "Frac u > c"))
+# 
+# imat1$species <- tolower(imat1$species)
+# imat1$species <- gsub("\\.", "\\ ", imat1$species)
+# 
+# imat2 <- 
+
+
+# 
+# 
+# p2 <- imat1 %>% dplyr::filter(name == "Perc Diff" | name =="Frac u > c") %>%  
+#   ggplot() +
+#   geom_hline(yintercept = 50, color = "coral3", alpha = 0.5) +
+#   geom_hline(yintercept = 0, color = "deepskyblue", alpha = 0.5) +
+#   geom_point(aes(x = species, y = value, color = name))+
+#   coord_cartesian(ylim = c(0, 100), clip = "on") +
+#   scale_color_manual(#labels = c("% Improvement in RMSPE \nfrom Conditioning",
+#     #          "Fraction of Predictions\nImproved by Conditioning"),
+#     values = c("coral3","deepskyblue"), guide = "none") +
+#   theme_bw() +
+#   theme(strip.background = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.spacing = unit(1.5, "lines"),
+#         plot.margin = margin(1,1,.5,.5, "cm")) +
+#   labs(x = "species", y = "", color = "") + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1))+ 
+#   ggtitle('Out-of-sample')+
+#   theme(plot.title = element_text(hjust = 0.5))+
+#   theme(plot.margin=unit(c(0,0,0,0),"mm"))+ 
+#   theme(plot.title = element_text(size=10))
+# 
+# p2
+# p1
+# 
+# p3 <- p1/p2
+# p3
+# 
+# ggsave("in_sample_metrics.jpg", plot=p1, width = 15, height=10, units=c("cm"), dpi=500)
+# 
+# ggsave("out_of_sample_metrics.jpg", plot=p2, width = 15, height=10, units=c("cm"), dpi=500)
+# 
+# ggsave("all_metrics.jpg", plot=p3, width = 20, height=15, units=c("cm"), dpi=500)
+# 
+
+
+```
+
+#4 Map
+In sample map 
+```{r}
+## Map ----
+
+load('out_full_CPUE_fall.Rdata')
+output <- out1
+ydata <- output$inputs$y
+xdata <- output$inputs$xdata
+
+total1 <- read.csv("total_with_env.csv") #this has the missing lat longs in it 
+
+colnames(total1) <- gsub("\\_", ".", colnames(total1)) #gjam doesnt like _ in column names 
+total1 <- total1[total1$year>1986,] 
+total1 <- total1[total1$SEASON == "FALL",]
+
+total1$SEDSIZE <- ifelse(total1$SEDIMENT ==  '0 - 0.03 Silt/Mud', .03, 
+                        ifelse(total1$SEDIMENT ==  '0.03 - 0.17 Sand', .17,
+                               ifelse(total1$SEDIMENT ==  '0.17 - 0.35 Sand',.35, 
+                                      ifelse(total1$SEDIMENT ==  '0.35 - 0.36 Sand', .36,
+                                             ifelse(total1$SEDIMENT ==  '0.36 - 0.48 Sand', .48, ifelse(total1$SEDIMENT ==  '0.48+ Coarse Sand to Gravel',.50,NA))))))
+
+xnames <- c("depth", "BT", "BSAL", "SSAL", "SST", "chla", "month", "season", "SEDSIZE", "SUBREGION2", "haulid", "lat", "lon", "stratum", "stratumarea", "year")
+xdata1 <- total1[colnames(total1) %in% xnames]
+xdata1 <- xdata1[xdata1$SUBREGION2 == "Gulf of Maine",]
+xdata1$SUBREGION2 <- gsub("Gulf of Maine", "GulfofMaine", xdata1$SUBREGION2 )
+
+xdata1$month <- as.factor(xdata1$month)
+xdata1$season <- as.factor(xdata1$season)
+xdata1$SUBREGION2 <- as.factor(xdata1$SUBREGION2)
+
+
+xdata <- left_join(xdata, xdata1,by = c("depth", "BT", "BSAL", "SSAL", "SST", "chla", "month", "season", "SEDSIZE", "SUBREGION2"))
+
+
+#predicted biomass per stratum 
+##observed
+total_strat_obs <- cbind(xdata, ydata) 
+total_strat_obs <- total_strat_obs %>% pivot_longer(cols = colnames(ydata), names_to = "spp", values_to = "biomass")
+
+total_strat_obs$pred_typ <- "observed"
+
+##conditional prediction
+total_strat_con <- cbind(xdata, pred_con) 
+total_strat_con <- total_strat_con %>% pivot_longer(cols = colnames(pred_con), names_to = "spp", values_to = "biomass")
+
+
+total_strat_con$pred_typ <- "conditional"
+
+##unconditional prediction
+total_strat_uncon <- cbind(xdata, y_pred) 
+total_strat_uncon <- total_strat_uncon %>% pivot_longer(cols = colnames(y_pred), names_to = "spp", values_to = "biomass")
+
+
+total_strat_uncon$pred_typ <- "unconditional"
+
+##diff 
+
+
+total_strat <- rbind(total_strat_obs, total_strat_con, total_strat_uncon)
+
+
+
+total_strat <- total_strat %>% group_by(season, spp, year, stratum, stratumarea, pred_typ) %>% summarise(biomass = mean(biomass)) %>% mutate(biomass_area = biomass*stratumarea)
+
+total_strat <- total_strat %>% mutate(pred_type = factor(pred_typ)) %>% mutate(pred_type = fct_relevel(pred_type, c("observed", "unconditional", "conditional")))
+
+#plotit 
+strat <- sf::st_read("stratum/BTS_strata.shp")
+#plot(strat)
+
+
+strat <- left_join(strat, total_strat, by = c("STRATA" = "stratum"))
+st_crs(strat) = 4326 #this is WGS 1984
+
+
+# plot
+library(rnaturalearth)
+world <- ne_countries(scale = "medium", returnclass = "sf")
+cols <- c("blue3", 
+          "purple",
+          "orange", "brown")
+p <- ggplot() + geom_sf(data = world) + 
+  geom_sf(data = subset(strat, strat$spp == "ATLANTIC.COD" & strat$year == 2016), aes(group = as.factor(biomass_area), fill = biomass_area))+ 
+  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) + scale_fill_gradientn(colours = cols,
+                        values = c(0, 0.1, 0.35, 0.75, 1)) + facet_wrap(~ pred_type) + theme_Publication() + theme(legend.position = "right", legend.direction = "vertical") +labs(fill = "Atlantic cod\nbiomass per stratum\n(kg/km2)")+
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(hjust = 0),
+        axis.title = element_blank(),
+        panel.spacing.x = unit(6, "mm")) 
+
+ggsave("codmaps_1.jpg", plot=p, width = 25, height=10, units=c("cm"), dpi=500)
+
+#difference maps 
+strat_sub <- strat %>% dplyr::select(-pred_typ, -biomass) %>% pivot_wider(names_from = "pred_type", values_from = biomass_area) %>% mutate(sub_con = conditional - observed, sub_uncon = unconditional - observed) %>% pivot_longer(cols = c("sub_uncon", "sub_con", "observed"))
+
+strat_sub <- st_as_sf(strat_sub)
+strat_sub <- strat_sub %>% filter(name %in% c("sub_uncon", "sub_con", "observed"))
+st_crs(strat_sub) = 4326
+strat_sub$name1 <- as.factor(strat_sub$name)
+
+cols <- c("blue3", 
+          "purple", "white",
+          "orange", "brown")
+
+label_names <- as_labeller(c("sub_uncon" = "unconditional - observed", "sub_con" = "conditional - observed", "observed" = "observed"))
+
+p <- ggplot() + geom_sf(data = world) + 
+  geom_sf(data = subset(strat_sub, strat_sub$spp == "ATLANTIC.COD" & strat_sub$year == 2012), aes(group = as.factor(value), fill = value))+ 
+  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) + facet_wrap(~ name1, labeller = label_names) + theme_Publication() + theme(legend.position = "right", legend.direction = "vertical") +labs(fill = "Atlantic cod\nbiomass per stratum\n(kg/km2)")+
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(hjust = 0),
+        axis.title = element_blank(),
+        panel.spacing.x = unit(6, "mm")) + scale_fill_gradient2(low = "blue3", high = "brown", mid = "white", midpoint = 1, breaks = c(-500,0,1000,2000))
+
+p
+
+ggsave("codmaps.jpg", plot=p, width = 25, height=10, units=c("cm"), dpi=500)
+```
