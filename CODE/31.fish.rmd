@@ -282,7 +282,7 @@ save(out_oos, ytrain, ytest, xtrain, xtest, file='../OUT/fish-out_train_CPUE_fal
 Conditional predict test data. Each species is conditioned on all other species
 ```{r}
 
-#load("../OUT/fish-out_train_CPUE_fall.rdata")
+load("../OUT/fish-out_train_CPUE_fall.rdata")
 
 #conditionally predict
 #holdout
@@ -313,7 +313,7 @@ Traditional predict test data.
 ```{r}
 
 #traditional predict
-newdata <- list(xdata = xtest, nsim=1000)
+newdata <- list(xdata = xtest, nsim=nsim)
 p7      <- gjamPredict(out_oos, newdata = newdata)
 y_obs <- ytest
 y_pred <- p7[["sdList"]][["yMu"]]
