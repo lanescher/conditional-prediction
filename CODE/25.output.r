@@ -174,20 +174,25 @@ A <- tmp$Atab %>%
                            T ~ ""),
          type = "hostToCow")
 
+A <- A %>%
+  mutate(Species = case_when(species == "commonyellowthroat" ~ "Common Yellowthroat",
+                             species == "songsparrow" ~ "Song Sparrow",
+                             species == "chippingsparrow" ~ "Chipping Sparrow",
+                             species == "americanyellowwarbler" ~ "American Yellow Warbler",
+                             species == "redwingedblackbird" ~ "Red-winged Blackbird",
+                             species == "redeyedvireo" ~ "Red-eyed Vireo",
+                             species == "americanredstart" ~ "American Redstart",
+                             species == "easternphoebe" ~ "Eastern Phoebe",
+                             species == "ovenbird" ~ "Ovenbird",
+                             species == "yellowbreastedchat" ~ "Yellow-breasted Chat",
+                             species == "yellowthroatedvireo" ~ "Yellow-throated Vireo",
+                             species == "fieldsparrow" ~ "Field Sparrow",
+                             species == "easterntowhee" ~ "Eastern Towhee",
+                             species == "indigobunting" ~ "Indigo Bunting",
+                             species == "bellsvireo" ~ "Bell's Vireo",
+                             species == "kirtlandswarbler" ~ "Kirtland's Warbler"))
 
-ggplot(A) +
-  geom_abline(intercept = 0, slope = 0) +
-  geom_point(aes(x = reorder(species, Estimate), y = Estimate, color = sigSE)) +
-  geom_segment(aes(x = reorder(species, Estimate), xend = reorder(species, Estimate),
-                   y = Estimate+SE, yend = Estimate-SE, color = sigSE)) +
-  scale_color_manual(values = c("gray70", "darkblue"), labels = c("Not significant",
-                                                                  "Significant"),
-                     name = "") +
-  theme_bw() +
-  theme(axis.text = element_text(angle = 45,
-                                 hjust = 1,
-                                 vjust = 0.5)) +
-  labs(x = "", y = "")
+
 
 
 
@@ -205,52 +210,83 @@ A1 <- tmp$Atab %>%
                            T ~ ""),
          type = "cowToHost") 
 
+A1 <- A1 %>%
+  mutate(Species = case_when(species == "commonyellowthroat" ~ "Common Yellowthroat",
+                             species == "songsparrow" ~ "Song Sparrow",
+                             species == "chippingsparrow" ~ "Chipping Sparrow",
+                             species == "americanyellowwarbler" ~ "American Yellow Warbler",
+                             species == "redwingedblackbird" ~ "Red-winged Blackbird",
+                             species == "redeyedvireo" ~ "Red-eyed Vireo",
+                             species == "americanredstart" ~ "American Redstart",
+                             species == "easternphoebe" ~ "Eastern Phoebe",
+                             species == "ovenbird" ~ "Ovenbird",
+                             species == "yellowbreastedchat" ~ "Yellow-breasted Chat",
+                             species == "yellowthroatedvireo" ~ "Yellow-throated Vireo",
+                             species == "fieldsparrow" ~ "Field Sparrow",
+                             species == "easterntowhee" ~ "Eastern Towhee",
+                             species == "indigobunting" ~ "Indigo Bunting",
+                             species == "bellsvireo" ~ "Bell's Vireo",
+                             species == "kirtlandswarbler" ~ "Kirtland's Warbler"))
 
-ggplot(A1) +
+
+# now plot them, ordered by host to cowbird
+ord <- A$Species[order(A$Estimate)]
+
+A1$Species <- factor(A1$Species, levels = ord)
+A$Species <- factor(A$Species, levels = ord)
+
+
+figA <- ggplot(A) +
   geom_abline(intercept = 0, slope = 0) +
-  geom_point(aes(x = reorder(species, Estimate), y = Estimate, color = sigSE)) +
-  geom_segment(aes(x = reorder(species, Estimate), xend = reorder(species, Estimate),
+  geom_point(aes(x = Species, y = Estimate, color = sigSE)) +
+  geom_segment(aes(x = Species, xend = Species,
                    y = Estimate+SE, yend = Estimate-SE, color = sigSE)) +
   scale_color_manual(values = c("gray70", "darkblue"), labels = c("Not significant",
                                                                   "Significant"),
                      name = "") +
   theme_bw() +
-  theme(axis.text = element_text(angle = 45,
-                                 hjust = 1,
-                                 vjust = 0.5)) +
-  labs(x = "", y = "")
+  theme(axis.text.x = element_blank(),
+        axis.text = element_text(size = 7),
+        axis.title = element_text(size = 8)) +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(-6.9, 3.3))
 
+figB <- ggplot(A1) +
+  geom_abline(intercept = 0, slope = 0) +
+  geom_point(aes(x = Species, y = Estimate, color = sigSE)) +
+  geom_segment(aes(x = Species, xend = Species,
+                   y = Estimate+SE, yend = Estimate-SE, color = sigSE)) +
+  scale_color_manual(values = c("gray70", "darkblue"), labels = c("Not significant",
+                                                                  "Significant"),
+                     name = "") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,
+                                 hjust = 1,
+                                 vjust = 0.5,
+                                 size = 7),
+        axis.text.y = element_text(size = 7),
+        axis.title = element_text(size = 8)) +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(-6.9, 3.3))
 
 
 # combine and plot
-A2 <- bind_rows(A, A1)
-ggplot(A2) +
-  geom_abline(intercept = 0, slope = 0) +
-  geom_point(aes(x = reorder(species, Estimate), y = Estimate,
-                 color = sigSE)) +
-  geom_segment(aes(x = reorder(species, Estimate), xend = reorder(species, Estimate),
-                   y = Estimate+SE, yend = Estimate-SE,
-                   color = sigSE)) +
-  scale_color_manual(values = c("gray70", "darkblue"), labels = c("Not significant",
-                                                                  "Significant"),
-                     guide = "none") +
-  theme_bw() +
-  theme() +
-  labs(x = "", y = "") +
-  facet_wrap(~ type, ncol = 1) +
-  theme(strip.background = element_blank(),
-        strip.text = element_blank(),
-        axis.text.x = element_text(angle = 90,
-                                 hjust = 1,
-                                 vjust = 0.5))
 
-ggsave(file = "OUT/figures/Amatrix.jpg", height = 4, width = 5)
+ggpubr::ggarrange(figA, figB, nrow = 2,
+                  labels = "auto", 
+                  common.legend = T, legend = "none",
+                  heights = c(1, 1.4),
+                  label.x = 0, label.y = 1.04,
+                  font.label = list(size = 10))
+
+ggsave(file = "../OUT/figures/Amatrix.png", height = 120, width = 80, 
+       units = "mm", dpi = 600)
 
 
 
 
 # 2. which/how many species are best to condition on ----
-load("OUT/birds-gjamOutput.rdata")
+load("../OUT/birds-gjamOutput.rdata")
 output <- out
 ydata <- output$inputs$y
 xdata <- output$inputs$xdata
@@ -309,7 +345,7 @@ for (s in 1:length(species)) {
 
 
 save(condImprovement, condOnList, predictSpList, file = "OUT/birds-conditionOn.rdata")
-load("OUT/birds-conditionOn.rdata")
+load("../OUT/birds-conditionOn.rdata")
 
 
 all <- c()
@@ -359,33 +395,74 @@ percZero <- data.frame(species = names(percZero),
 
 all <- inner_join(all, percZero, by = c("species"))
 
-p <- ggplot(all) +
-  #geom_point(aes(x = predOn, y = value, color = species)) +
-  facet_wrap(~ cat, scales = "free_y", strip.position = "left") +
+
+
+rmspeImprovedBy <- all %>%
+  filter(cat == "by")
+a <- ggplot(rmspeImprovedBy) +
+  geom_hline(yintercept = 0) +
   geom_ribbon(aes(x = predOn, ymin = Lo, ymax  = Hi, fill = percZero, group = percZero), alpha = 0.4) +
   geom_line(aes(x = predOn, y = Mean, color = percZero, group = percZero)) +
-  #geom_smooth(aes(x = predOn, y = value, group = species, color = percZero), method = "loess") +
   theme_bw() +
   theme(strip.background = element_blank(),
         panel.grid.minor.x = element_blank(),
         strip.placement = "outside",
-        plot.margin = margin(.5,.5,.5,.5, "cm")) +
-  labs(x = "Number of species conditioned on", y = "") +
-  scale_x_continuous(breaks = 1:16, labels = 1:16) +
+        axis.text = element_text(size = 7),
+        axis.title = element_text(size = 8),
+        plot.margin = margin(.5,.5,0,.5, "cm")) +
+  labs(x = "", y = "Percent Improvement in RMSPE") +
+  scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
   scale_color_gradientn(values = c(0, 1),
                         colors = c('blue', "orange"),
                         guide = "none") +
   scale_fill_gradientn(values = c(0, 1),
-                        colors = c('blue', "orange"),
-                        guide = "none") +
+                       colors = c('blue', "orange"),
+                       guide = "none") +
+  coord_cartesian(clip = "off")
+
+percPredsImproved <- all %>%
+  filter(cat == "frac")
+b <- ggplot(percPredsImproved) +
+  geom_hline(yintercept = 50) +
+  geom_ribbon(aes(x = predOn, ymin = Lo, ymax  = Hi, fill = percZero, group = percZero), alpha = 0.4) +
+  geom_line(aes(x = predOn, y = Mean, color = percZero, group = percZero)) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        strip.placement = "outside",
+        legend.key.height = unit(.75, "cm"),
+        legend.key.width = unit(.4, "cm"),
+        legend.title = element_text(size = 7),
+        legend.text= element_text(size = 6),
+        axis.text = element_text(size = 7),
+        axis.title = element_text(size = 8),
+        plot.margin = margin(.5,.5,0,.5, "cm")) +
+  labs(x = "", y = "Percent of Predictions Improved", color = "Species \nCommonness") +
+  scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"),
+                       guide = "none") +
   coord_cartesian(clip = "off")
 
 
-egg::tag_facet(p, open = "", close = "",
-               hjust = 2, vjust = -.5)
+fig <- ggpubr::ggarrange(a, b,
+                  common.legend = T,
+                  legend = 'right', 
+                  labels = 'auto',
+                  label.x = 0, label.y = 1.01,
+                  font.label = list(size = 10))
+ggpubr::annotate_figure(fig,
+                        bottom = ggpubr::text_grob("Number of Species Conditioned On",
+                                                   size = 8))
 
-ggsave(file = "OUT/figures/conditionOn.jpg",
-       height = 5, width = 12)
+
+ggsave(file = "../OUT/figures/conditionOn.png", height = 80, width = 180, 
+       units = "mm", dpi = 600)
+
+
+
 
 
 ### see which species decline as more incidental species are added

@@ -529,56 +529,87 @@ all <- bind_rows(MVNall, MVN2,
 all$type1 <- factor(all$type1, levels = c("Continuous", "Continuous abundance", 
                                          "Discrete abundance", "Presence-absence"))
 
-save(all, file = "OUT/simulation.rdata")
-load("OUT/simulation.rdata")
+#save(all, file = "../OUT/simulation.rdata")
+load("../OUT/simulation.rdata")
 
 cond.labs1 <- c("a", "b", "c")
 names(cond.labs1) <- c(0, 1, 9)
 
-a <- ggplot(all) +
-  geom_hline(yintercept = 0, color = "black") +
-  #geom_boxplot(aes(x = as.factor(covSp), y = `Perc Diff`), fill = "gray") +
-  geom_boxplot(aes(x = type1, y = `Perc Diff`), fill = "gray") +
-  #facet_grid(cols = vars(type)) +
-  facet_grid(cols = vars(covSp),
-             labeller = labeller(covSp = cond.labs1)) +
+cols <- c("hotpink4", "dodgerblue3", "forestgreen", "orange2")
+cols1 <- colorspace::lighten(cols)
+cols2 <- colorspace::lighten(cols, 0.6)
+
+
+base <- ggplot() +
+  scale_color_manual(values = cols1) +
+  scale_fill_manual(values = cols2) +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "none",
+        axis.text = element_text(size = 7),
+        axis.title = element_text(size = 8),
+        plot.title = element_text(size = 8,
+                                  hjust = 0.5))
+
+top <- base  +
   coord_cartesian(ylim = c(-25, 100)) +
-  theme_bw() +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(hjust = 0,
-                                  size = 10,
-                                  face = "bold"),
-        panel.grid.minor = element_blank(),
-        axis.text.x = element_blank()) +
-  labs(x = "", y = "Percent improvement in RMSPE")
+  labs(x = "", y = "Percent improvement \nin RMSPE", fill = "", color = "") +
+  geom_hline(yintercept = 0, color = "black") +
+  theme(plot.margin = margin(15, 0.1, 0, 0.1),
+        axis.text.x = element_blank())
 
-cond.labs2 <- c("d", "e", "f")
-names(cond.labs2) <- c(0, 1, 9)
-
-b <- ggplot(all) +
-  geom_hline(yintercept = 50, color = "black") +
-  #geom_boxplot(aes(x = as.factor(covSp), y = fracuc), fill = "gray") +
-  geom_boxplot(aes(x = type1, y = fracuc), fill = "gray") +
-  #facet_grid(cols = vars(type)) +
-  facet_grid(cols = vars(covSp),
-             labeller = labeller(covSp = cond.labs2)) +
+bottom <- base  +
   coord_cartesian(ylim = c(0, 100)) +
-  theme_bw() +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(hjust = 0,
-                                  size = 10,
-                                  face = "bold"),
-        panel.grid.minor = element_blank(),
-        axis.text.x = element_text(angle = 90,
-                                   hjust = 1,
-                                   vjust = 0.5)) +
-  labs(x = "", y = "Percent of observations improved")
+  labs(x = "", y = "Percent of \nobservations improved", fill = "", color = "") +
+  geom_hline(yintercept = 50, color = "black") +
+  theme(plot.margin = margin(0, 0.1, 0, 0.1))
 
 
-library(patchwork)
-a/b
+a <- top +
+  geom_boxplot(data = filter(all, covSp == 9),
+               aes(x = type, fill = type, color = type,
+                   y = `Perc Diff`)) +
+  labs(title = "Residual covariance with 9 species")
 
+b <- top +
+  geom_boxplot(data = filter(all, covSp == 1),
+               aes(x = type, fill = type, color = type,
+                   y = `Perc Diff`)) +
+  labs(y = "", title = "Residual covariance with 1 species")
 
-ggsave("OUT/figures/simulationSummary.jpg", height = 8, width = 10)
+c <- top +
+  geom_boxplot(data = filter(all, covSp == 0),
+               aes(x = type, fill = type, color = type,
+                   y = `Perc Diff`)) +
+  labs(y = "", title = "Residual covariance with 0 species")
+
+d <- bottom +
+  geom_boxplot(data = filter(all, covSp == 9),
+               aes(x = type, fill = type, color = type,
+                   y = (`Frac u > c`)*100))
+
+e <- bottom +
+  geom_boxplot(data = filter(all, covSp == 1),
+               aes(x = type, fill = type, color = type,
+                   y = (`Frac u > c`)*100)) +
+  labs(y = "")
+
+f <- bottom +
+  geom_boxplot(data = filter(all, covSp == 0),
+               aes(x = type, fill = type, color = type,
+                   y = (`Frac u > c`)*100)) +
+  labs(y = "")
+
+ggpubr::ggarrange(a, b, c, d, e, f,
+          labels = "auto",
+          label.x = 0.05, label.y = .95,
+          font.label = list(size = 10),
+          align = "hv")
+
+ggsave("../OUT/figures/simulationSummary.png", 
+       height = 100, width = 180, units = "mm", dpi = 600)
+
 
 

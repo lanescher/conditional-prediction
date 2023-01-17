@@ -436,7 +436,7 @@ save(out_is, xdata, ydata, file='../OUT/fish-out_full_CPUE_fall.Rdata')
 
 Condition each species on all others
 ```{r}
-#load('../DATA/fish-out_full_CPUE_fall.Rdata') #in case you don't want to run the full thing
+load('../ouT/fish-out_full_CPUE_fall.Rdata') #in case you don't want to run the full thing
 
 
 all <- c() # store comparison metrics
@@ -521,17 +521,38 @@ colnames(zeros) <- c("abun", "species")
 full <- full_join(all1, imat1, by = c("species", "metric")) %>%
   full_join(zeros, "species") %>%
   pivot_longer(cols = c("is", "oos")) %>%
-  mutate(fill = case_when(name == "oos" ~ "empty",
-                          name == "is" &
-                            metric == "percDiff" ~ "one",
-                          name == "is" &
-                            metric == "percImpr" ~ "two"))
+  mutate(Species = case_when(species == "ACADIAN.REDFISH" ~ "Acadian Redfish",
+                             species == "AMERICAN.LOBSTER" ~ "American Lobster",
+                             species == "AMERICAN.PLAICE" ~ "American Plaice",
+                             species == "ATLANTIC.COD" ~ "Atlantic Cod",
+                             species == "ATLANTIC.HERRING" ~ "Atlantic Herring",
+                             species == "BARNDOOR.SKATE" ~ "Barndoor Skate",
+                             species == "BUTTERFISH" ~ "Butterfish",
+                             species == "FOURSPOT.FLOUNDER" ~ "Four-spot Flounder",
+                             species == "HADDOCK" ~ "Haddock",
+                             species == "LITTLE.SKATE" ~ "Little Skate",
+                             species == "LONGFIN.SQUID" ~ "Longfin Squid",
+                             species == "LONGHORN.SCULPIN" ~ "Longhorn Sculpin",
+                             species == "NORTHERN.SEAROBIN" ~ "Northern Searobin",
+                             species == "NORTHERN.SHORTFIN.SQUID" ~ "Northern Shortfin Squid",
+                             species == "POLLOCK" ~ "Pollock",
+                             species == "RED.HAKE" ~ "Red Hake",
+                             species == "SEA.SCALLOP" ~ "Sea Scallop",
+                             species == "SILVER.HAKE" ~ "Silver Hake",
+                             species == "SPINY.DOGFISH" ~ "Spinny Dogfish",
+                             species == "SUMMER.FLOUNDER" ~ "Summer Flounder",
+                             species == "WHITE.HAKE" ~ "White Hake",
+                             species == "WINTER.FLOUNDER" ~ "Winter Flounder",
+                             species == "WINTER.SKATE" ~ "Winter Skate",
+                             species == "YELLOWTAIL.FLOUNDER" ~ "Yellowtail Flounder"),
+         group = case_when(name == "is" ~ "In-sample",
+                           name == "oos" ~ "Out-of-sample")) 
 
 
-a <- ggplot(full) + 
+b <- ggplot(full) + 
   geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
   geom_hline(yintercept = 0, color = "coral3", alpha = 0.5) +
-  geom_point(aes(x = reorder(species, abun), y = value, color = metric, shape = name)) +
+  geom_point(aes(x = reorder(Species, abun), y = value, color = metric, shape = name)) +
   scale_color_manual(#labels = c("% Improvement in RMSPE \nfrom Conditioning",
     #          "Fraction of Predictions\nImproved by Conditioning"),
     values = c("coral3","deepskyblue"), guide = "none") +
@@ -540,49 +561,91 @@ a <- ggplot(full) +
   theme(strip.background = element_blank(),
         panel.grid.minor = element_blank(),
         panel.spacing = unit(1.5, "lines"),
-        plot.margin = margin(1,.1,.5,.5, "cm"),
-        axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1)) +
+        plot.margin = unit(c(1,.1,0,0), "cm"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1,
+                                   size = 7),
+        axis.text.y = element_blank(),
+        axis.title = element_text(size = 8)) +
   coord_cartesian(ylim = c(0, 100), clip = "on") +
   labs(x = "", y = "")
 
-b <- ggplot(filter(full, metric == "percImpr")) +
-  geom_boxplot(aes(x = name, y = value, alpha = name),
-               color = "deepskyblue",
-               fill = "deepskyblue") +
-  scale_alpha_manual(values = c(.6, 0)) +
-  theme_bw() +
-  theme(strip.background = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.spacing = unit(1.5, "lines"),
-        plot.margin = margin(1,1,0,0, "cm"),
-        axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
-        legend.position = "none") +
-  coord_cartesian(ylim = c(50, 100), clip = "on") +
-  labs(x = "", y = "")
+# b <- ggplot(filter(full, metric == "percImpr")) +
+#   geom_boxplot(aes(x = name, y = value, alpha = name),
+#                color = "deepskyblue",
+#                fill = "deepskyblue") +
+#   scale_alpha_manual(values = c(.6, 0)) +
+#   scale_y_continuous(breaks = c(50, 75, 100)) +
+#   theme_bw() +
+#   theme(strip.background = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.spacing = unit(1.5, "lines"),
+#         plot.margin = margin(1, 0, 0, 0, "cm"),
+#         axis.text.x = element_blank(),
+#         axis.ticks.x = element_blank(),
+#         legend.position = "none") +
+#   coord_cartesian(ylim = c(50, 100), clip = "on") +
+#   labs(x = "", y = "")
+# 
+# c <- ggplot(filter(full, metric == "percDiff")) +
+#   geom_boxplot(aes(x = name, y = value, alpha = name),
+#                color = "coral3",
+#                fill = "coral3") +
+#   scale_alpha_manual(values = c(.6, 0)) +
+#   scale_y_continuous(breaks = c(0, 25, 50)) +
+#   theme_bw() +
+#   theme(strip.background = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.spacing = unit(1.5, "lines"),
+#         plot.margin = margin(0, 0, 1, 0, "cm"),
+#         axis.ticks.x = element_blank(),
+#         legend.position = "none") +
+#   coord_cartesian(ylim = c(0, 50), clip = "on") +
+#   labs(x = "", y = "")
+# 
 
-c <- ggplot(filter(full, metric == "percDiff")) +
-  geom_boxplot(aes(x = name, y = value, alpha = name),
+
+a <- ggplot() + 
+  geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "coral3", alpha = 0.5) +
+  geom_boxplot(data = filter(full, metric == "percDiff"),
+               aes(x = group, y = value, alpha = name),
                color = "coral3",
                fill = "coral3") +
+  geom_boxplot(data = filter(full, metric == "percImpr"),
+               aes(x = group, y = value, alpha = name),
+               fill = "deepskyblue",
+               color = "deepskyblue") +
   scale_alpha_manual(values = c(.6, 0)) +
+  coord_cartesian(ylim = c(0, 100)) +
   theme_bw() +
   theme(strip.background = element_blank(),
         panel.grid.minor = element_blank(),
         panel.spacing = unit(1.5, "lines"),
-        plot.margin = margin(0, 1, 1, 0, "cm"),
-        axis.text.x = element_blank(),
-        axis.ticks.x = element_blank(),
+        plot.margin = unit(c(0, 0, 1, 0), "cm"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1,
+                                   size = 7),
+        axis.text.y = element_text(size = 7),
+        axis.title = element_text(size = 8),
         legend.position = "none") +
-  coord_cartesian(ylim = c(0, 50), clip = "on") +
   labs(x = "", y = "")
+  
 
-library(patchwork)
-a + (b/c) +
-  plot_layout(widths = c(1, 0.3))
 
-ggsave(filename = "../OUT/figures/metrics.jpg",
-       height = 5, width = 8)
+
+ggpubr::ggarrange(a, b, nrow = 1,
+                  labels = "auto",
+                  widths = c(0.3, 1),
+                  label.x = c(0.04, 0.02), label.y = .95,
+                  font.label = list(size = 10),
+                  align = "hv")
+
+
+# library(patchwork)
+# (b/c) + a +
+#   plot_layout(widths = c(1, 0.3))
+
+ggsave(filename = "../OUT/figures/metrics.tiff",
+       height = 100, width = 180, units = "mm", dpi = 600)
 
 ```
 
@@ -707,30 +770,75 @@ strat_sub <- strat_sub %>% filter(name %in% c("sub_uncon", "sub_con", "observed"
 st_crs(strat_sub) = 4326
 strat_sub$name1 <- as.factor(strat_sub$name)
 
-cols <- c("blue3", 
-          "purple", "white",
-          "orange", "brown")
 
-label_names <- as_labeller(c("sub_uncon" = "unconditional - observed", "sub_con" = "conditional - observed", "observed" = "observed"))
+# just for the maps, set limits at 2000 and -1000
+strat_sub$value[which(strat_sub$value > 2000)] <- 2000
+strat_sub$value[which(strat_sub$value < -1000)] <- -1000
 
-p <- ggplot() + 
+
+
+base <- ggplot() + 
   geom_sf(data = world) + 
-  geom_sf(data = subset(strat_sub, 
-                        strat_sub$spp == "ATLANTIC.COD" & strat_sub$year == 2012),
-          aes(group = as.factor(value), fill = value))+ 
-  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) + 
-  facet_wrap(~ name1, labeller = label_names) + 
-  theme_Publication() + 
-  theme(legend.position = "right", legend.direction = "vertical") +
-  labs(fill = "Atlantic cod\nbiomass per stratum\n(kg/km2)")+
+  labs(fill = "Atlantic cod biomass (kg/km2)")+
   theme_bw() +
   theme(panel.grid = element_blank(),
         strip.background = element_blank(),
         strip.text = element_text(hjust = 0),
+        plot.title = element_text(size = 8,
+                             hjust = 0.5),
         axis.title = element_blank(),
-        panel.spacing.x = unit(6, "mm")) + 
+        axis.text = element_text(size = 7),
+        #panel.spacing.x = unit(6, "mm"),
+        plot.margin = margin(5, 1, 3, 1),
+        legend.key.height = unit(.5, "cm"),
+        legend.key.width = unit(1.1, "cm"),
+        legend.title = element_text(size = 7,
+                                    hjust = 0.5),
+        #legend.title.align = 0.5,
+        legend.direction = "horizontal",
+        legend.text= element_text(size = 6)) +
   scale_fill_gradient2(low = "darkblue", high = "red4", mid = "white", 
-                       midpoint = 0, breaks = c(-1000,0,1000,2000))
+                      midpoint = 0, breaks = c(-1000,0,1000,2000),
+                      limits = c(-1000, 2000),
+                      guide = guide_colorbar(title.position = "top")) +
+  scale_y_continuous(breaks = c(40, 43, 46)) +
+  scale_x_continuous(breaks = c(-66, -70, -74))
 
-ggsave("../OUT/figures/codmaps.jpg", plot=p, width = 25, height=10, units=c("cm"), dpi=500)
+
+
+a <- base +
+  geom_sf(data = filter(strat_sub, 
+                        strat_sub$spp == "ATLANTIC.COD",
+                        strat_sub$year == 2012,
+                        name == "observed"),
+          aes(group = as.factor(value), fill = value)) +
+  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
+  labs(title = "Observed")
+  
+b <- base +
+  geom_sf(data = filter(strat_sub, 
+                        strat_sub$spp == "ATLANTIC.COD",
+                        strat_sub$year == 2012,
+                        name == "sub_uncon"),
+          aes(group = as.factor(value), fill = value)) +
+  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
+  labs(title = "Traditional Prediction - Observed")
+  
+c <- base +
+  geom_sf(data = filter(strat_sub, 
+                        strat_sub$spp == "ATLANTIC.COD",
+                        strat_sub$year == 2012,
+                        name == "sub_con"),
+          aes(group = as.factor(value), fill = value)) +
+  coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
+  labs(title = "Conditional Prediction - Observed")
+  
+ggpubr::ggarrange(a, b, c, ncol = 1,
+                  labels = "auto", common.legend = T,
+                  label.y = 1.01, label.x = 0.15,
+                  legend = "bottom",
+                  font.label = list(size = 10))
+
+ggsave("../OUT/figures/codmaps.png", width = 80, height=180, units=c("mm"), 
+       dpi = 600)
 ```
