@@ -437,12 +437,16 @@ b <- ggplot(percPredsImproved) +
         axis.text = element_text(size = 7),
         axis.title = element_text(size = 8),
         plot.margin = margin(.5,.5,0,.5, "cm")) +
-  labs(x = "", y = "Percent of Predictions Improved", color = "Species \nCommonness") +
+  labs(x = "", y = "Percent of Predictions Improved", color = "Percent non-zero \nobservations") +
   scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
   scale_color_gradientn(values = c(0, 1),
-                        colors = c('blue', "orange")) +
+                        colors = c('blue', "orange"), 
+                        breaks = c(0, 0.25, 0.5, 0.75, 1),
+                        labels = c(0, 25, 50, 75, 100)) +
   scale_fill_gradientn(values = c(0, 1),
-                       colors = c('blue', "orange"),
+                       colors = c('blue', "orange"), 
+                       breaks = c(0, 0.25, 0.5, 0.75, 1),
+                       labels = c(0, 25, 50, 75, 100),
                        guide = "none") +
   coord_cartesian(clip = "off")
 
