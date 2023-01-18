@@ -644,7 +644,7 @@ ggpubr::ggarrange(a, b, nrow = 1,
 # (b/c) + a +
 #   plot_layout(widths = c(1, 0.3))
 
-ggsave(filename = "../OUT/figures/metrics.tiff",
+ggsave(filename = "../OUT/figures/metrics.png",
        height = 100, width = 180, units = "mm", dpi = 600)
 
 ```
