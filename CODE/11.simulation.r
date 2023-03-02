@@ -8,7 +8,6 @@
 # set up packages and functions
 library(gjam)
 library(tidyverse)
-#Rcpp::sourceCpp( 'R:/clark/clark.unix/GJAM/makeGJAMcurrent/RcppFunctions/cppFns.cpp' )
 
 .binaryScore <- function(p, x){
   
@@ -21,173 +20,65 @@ library(tidyverse)
 }
 
 
-conditionalComparison <- function( output, newdata ){
-  
-  # compare conditional prediction with unconditional prediction in output
-  
-  ydataCond <- newdata$ydataCond
-  colnames(ydataCond) <- .cleanNames( colnames(ydataCond) )
-  
-  y           <- as.matrix( output$inputs$y )
-  colnames(y) <- .cleanNames( colnames(y) )
-  
-  typeNames <- output$modelList$typeNames
-  zeroCols  <- which(typeNames %in% c('DA','CA','OC','CC'))
-  
-  x         <- output$inputs$xUnstand
-  S         <- ncol(y)
-  n         <- nrow(x)
-  if( is.null(ydataCond) )stop(' newdata must include ydataCond ' )
-  if( is.null(colnames(ydataCond)) )stop( 'ydataCond must have colnames matching ydata' )
-  
-  y0 <- y
-  y0[ y0 > 0 ] <- 1
-  percZero <- signif(1 - apply(y0, 2, sum)/nrow(y0),3)*100
-  
-  ni <- match(colnames(ydataCond), colnames(y))   # condition on these columns
-  ci <- c(1:S)[-ni]
-  if( length(ni) < ncol(ydataCond) )stop( 'ydataCond must have colnames matching ydata' )
-  
-  edata <- output$inputs$effMat
-  if( is.null(edata) )edata <- newdata$effort$values
-  if( is.null(edata) )edata <- y*0 + 1
-  wUn <- output$prediction$ypredMu/edata
-  w   <- y/edata
-  
-  preds  <- gjamPredict(output, newdata = newdata, FULL=T) 
-  condy  <- preds$sdList$yMu                                # on data scale
-  condw  <- condy/edata                                     # latent scale
-  
-  coni <- (w[,ci] - condw[,ci] )^2
-  unci <- ( w[,ci] - wUn[,ci] )^2
-  umc  <- unci - coni
-  uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
-  
-  uno <- umc
-  uno[ uno > 0 ] <- 1
-  uno[ uno <= 0 ] <- 0
-  
-  
-  if( length(ci) == 1 ){
-    con <- mean( coni  )
-    unc <- mean( unci )
-    uno <- sum(uno)/length(uno)
-  }else{ 
-    con <- diag( var( w[,ci] - condw[,ci] ) )
-    unc <- diag( var( w[,ci] - wUn[,ci] ) )
-    uno <- apply(uno, 2, sum)/nrow(umc)
-  }
-  
-  wi <- which(typeNames[ci] == 'PA')
-  if( length(wi) > 0){
-    tt <- .binaryScore(condw[,ci[wi]], y[,ci[wi]])
-    con <- tt$brierScore
-    #  ccLog   <- tt$logScore
-    
-    tt <- .binaryScore(wUn[,ci[wi]], y[,ci[wi]])
-    unc <- tt$brierScore
-    #  uuLog   <- tt$logScore
-  }
-  
-  
-  sigma <- output$parameters$sigMu
-  beta  <- output$parameters$betaMu
-  
-  C  <- solve(sigma[ni,ni])%*%sigma[ni,ci]      # check for correlation matrix
-  mu <- x%*%beta
-  
-  if(length(zeroCols) > 0){
-    mz <- mu[,zeroCols]
-    mz[ mz < 0 ] <- 0
-    mu[,zeroCols] <- mz
-  }
-  Rs <- w[,ci,drop=F] - mu[,ci,drop=F]
-  Rn <- w[,ni,drop=F] - mu[,ni,drop=F]
-  D  <- Rn%*%C
-  # z  <- -(2*t(Rs) + t(D))%*%D
-  
-  z <- ( 2*t(Rs) - t(C)%*%t(Rn) )%*%Rn%*%C
-  colnames(z) <- rownames(z)
-  
-  vmu <- var(mu[,ci])
-  vd  <- var(D)
-  cf  <- vd/(vmu + vd)      #variance fraction from conditional
-  
-  fe <- output$fit$fractionExplained
-  ynames <- colnames(fe)
-  ynames <- ynames[ ynames %in% colnames(condy)[ci] ]
-  ynames <- ynames[ !ynames == 'other' ]
-  
-  if( length(wi) == 0 ){   # not PA data
-    
-    if( length(ci) == 1 ){
-      
-      imat <- cbind( unc, con, 
-                     (unc - con)/unc*100, uno,
-                     fe[1,ynames], diag(cf), diag(z)[ynames]/n )
-    }else{
-      imat <- cbind( unc[ynames], con[ynames], 
-                     (unc - con)[ynames]/unc[ynames]*100, uno[ynames],
-                     fe[1,ynames], diag(cf)[ynames], diag(z)[ynames]/n )
-    }
-    colnames(imat) <- c("Unc MSPE", "Con MSPE", "Perc Diff", "Frac u > c",
-                        "Frac Expl", 
-                        "Frac Con", "CIS")
-  }else{  # PA data
-    
-    if( length(ci) == 1 ){
-      
-      imat <- cbind( unc, con, 
-                     (unc - con)/unc*100, uno,
-                     fe[1,ynames], diag(cf) )
-    }else{
-      imat <- cbind( unc[ynames], con[ynames], (unc - con)[ynames]/unc[ynames]*100, 
-                     uno[ynames],
-                     fe[1,ynames], diag(cf)[ynames] )
-    }
-    colnames(imat) <- c("Unc Brier", "Con Brier", "Perc Diff", "Frac u > c",
-                        "Frac Expl", 
-                        "Frac Con")
-  }
-  if(typeNames[1] != 'CON'){
-    percZero <- percZero[ynames]
-    imat <- cbind(imat, percZero)
-  }
-  if( nrow(imat) == 1)rownames(imat) <- colnames(y)[ci]
-  out1 <- list(imat, C)
-  out1
-}
 
-# this function applies conditionalComparison() iteratively
-# to each species in a model, conditioning on all other species
-conditionalComparisonEach <- function(output) {
-  sp <- colnames(out$inputs$y)
+compareEachSpecies <- function(out, nsim = 2000) {
+  compare <- c()
+  ydata <- out$inputs$y
   
-  tmp <- c()
-  for (s in 1:length(sp)) {
-    print(paste0("Species ", s, " of ", S))
+  for (s in 1:ncol(out$inputs$y)){
     
-    # get species to predict and condition on
-    pred <- sp[s]
-    condOn <- sp[-s]
+    true <- ydata[,s]
+    trad <- out$prediction$ypredMu[,s]
     
-    # set up data
-    condOnData <- ydata[,condOn]
-    newdata <- list(ydataCond = condOnData,  nsim=200)
     
-    # compare conditional and unconditional
-    comp <- conditionalComparison(out, newdata)
-    comp <- comp[[1]]
-    comp <- as.data.frame(comp)
+    # conditional prediction
     
-    comp$species <- sp[s]
-    #comp$out <- paste0("out-", o)
-    comp$run <- i
+    conditionOn <- colnames(ydata)[-s]
+    conditionOnData <- select(as.data.frame(ydata), all_of(conditionOn))
+    
+    newdata <- list(ydataCond = conditionOnData,  nsim=nsim)
+    cond_pred <- gjamPredict(output = out, newdata = newdata)
+    cond <- cond_pred$sdList$yMu[,s]
+    
+    # get spe
+    con <- (ydata[,s] - cond)^2
+    unc <- (ydata[,s] - trad)^2
+    
+    # how many spe are greater for traditional prediction
+    umc  <- unc - con
+    uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
+    
+    # get rmspe
+    rmspecond <- sqrt(mean(con))
+    rmspetrad <- sqrt(mean(unc))
+    
+    if(unique(out$modelList$typeNames) == "PA") {
+      tt <- .binaryScore(cond, true)
+      rmspecond <- tt$brierScore
 
-    tmp <- bind_rows(tmp, comp)
+      tt <- .binaryScore(trad, true)
+      rmspetrad <- tt$brierScore
+
+    }
+    
+    
+    
+    
+    # add to compare dataframe
+    comp <- data.frame(species = colnames(ydata)[s],
+                       "Unc RMSPE" = rmspetrad, 
+                       "Con RMSPE" = rmspecond, 
+                       "Perc Diff" = (rmspetrad-rmspecond)/rmspetrad * 100, 
+                       "Frac u > c" = uno)
+    colnames(comp) <- c("species", "Unc RMSPE", "Con RMSPE", "Perc Diff", "Frac u > c")
+    
+    compare <- bind_rows(compare, comp)
   }
-  return(tmp)
-}
+  
+  return(compare)
+  
+} 
+
 
 myrmvnorm <- function (nn, mu, sigma){
   
@@ -236,16 +127,6 @@ tnormMVNmatrix <- function(avec, muvec, smat,
                        idxALL = c(0:(nrow(smat)-1)) )  
   r[,whichSample] <- a[,whichSample]
   r
-}
-
-.cleanNames <- function(xx){
- 
-  xx <- gsub('-','',xx)
-  xx <- gsub('_','',xx)
-  xx <- gsub(' ','',xx)
-  xx <- gsub("'",'',xx)
-  
-  xx
 }
 
 
@@ -331,7 +212,9 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
+  
   
   MVNall <- bind_rows(MVNall, compare)
 
@@ -347,7 +230,11 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
+  
+  
+  
   
   MVN2 <- bind_rows(MVN2, compare)
   
@@ -368,7 +255,8 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   CAall <- bind_rows(CAall, compare)
   
@@ -389,7 +277,8 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   CA2 <- bind_rows(CA2, compare)
   
@@ -411,7 +300,7 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   DAall <- bind_rows(DAall, compare)
   
@@ -433,9 +322,10 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   DA2 <- bind_rows(DA2, compare)
+  
   
   
   ## PA ----
@@ -456,7 +346,8 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   PAall <- bind_rows(PAall, compare)
   
@@ -478,7 +369,8 @@ for (i in 1:reps) {
   out <- gjam( formula = formula, xdata, ydata, modelList )
   
   # compare
-  compare <- conditionalComparisonEach(output = out)
+  #compare <- conditionalComparisonEach(output = out)
+  compare <- compareEachSpecies(out = out)
   
   PA2 <- bind_rows(PA2, compare)
   
@@ -532,6 +424,9 @@ all$type1 <- factor(all$type1, levels = c("Continuous", "Continuous abundance",
 #save(all, file = "../OUT/simulation.rdata")
 load("../OUT/simulation.rdata")
 
+all$type1 <- factor(all$type, levels = c("CON", "CA", "DA", "PA"))
+
+
 cond.labs1 <- c("a", "b", "c")
 names(cond.labs1) <- c(0, 1, 9)
 
@@ -548,13 +443,13 @@ base <- ggplot() +
         strip.text = element_blank(),
         panel.grid.minor = element_blank(),
         legend.position = "none",
-        axis.text = element_text(size = 7),
-        axis.title = element_text(size = 8),
-        plot.title = element_text(size = 8,
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 9),
+        plot.title = element_text(size = 9,
                                   hjust = 0.5))
 
 top <- base  +
-  coord_cartesian(ylim = c(-25, 100)) +
+  coord_cartesian(ylim = c(-150, 100)) +
   labs(x = "", y = "Percent improvement \nin RMSPE", fill = "", color = "") +
   geom_hline(yintercept = 0, color = "black") +
   theme(plot.margin = margin(15, 0.1, 0, 0.1),
@@ -562,51 +457,53 @@ top <- base  +
 
 bottom <- base  +
   coord_cartesian(ylim = c(0, 100)) +
-  labs(x = "", y = "Percent of \nobservations improved", fill = "", color = "") +
+  labs(x = "", y = "Percent of \npredictions improved", fill = "", color = "") +
   geom_hline(yintercept = 50, color = "black") +
-  theme(plot.margin = margin(0, 0.1, 0, 0.1))
+  theme(plot.margin = margin(0, 0.1, 0, 0.1)) +
+  scale_y_continuous(breaks = c(0, 25, 50, 75, 100))
 
 
 a <- top +
   geom_boxplot(data = filter(all, covSp == 9),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = `Perc Diff`)) +
-  labs(title = "Residual covariance with 9 species")
+  labs(title = "Residual covariance with \n9 species")
 
 b <- top +
   geom_boxplot(data = filter(all, covSp == 1),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = `Perc Diff`)) +
-  labs(y = "", title = "Residual covariance with 1 species")
+  labs(y = "", title = "Residual covariance with \n1 species")
 
 c <- top +
   geom_boxplot(data = filter(all, covSp == 0),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = `Perc Diff`)) +
-  labs(y = "", title = "Residual covariance with 0 species")
+  labs(y = "", title = "Residual covariance with \n0 species")
 
 d <- bottom +
   geom_boxplot(data = filter(all, covSp == 9),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = (`Frac u > c`)*100))
 
 e <- bottom +
   geom_boxplot(data = filter(all, covSp == 1),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = (`Frac u > c`)*100)) +
   labs(y = "")
 
 f <- bottom +
   geom_boxplot(data = filter(all, covSp == 0),
-               aes(x = type, fill = type, color = type,
+               aes(x = type1, fill = type1, color = type1,
                    y = (`Frac u > c`)*100)) +
   labs(y = "")
 
 ggpubr::ggarrange(a, b, c, d, e, f,
           labels = "auto",
-          label.x = 0.05, label.y = .95,
+          label.x = c(0.13, 0.09, 0.09, 0.13, 0.09, 0.09), 
+          label.y = c(0.85, 0.85, 0.85, 1.1, 1.1, 1.1),
           font.label = list(size = 10),
-          align = "hv")
+          heights = c(1.2, 1))
 
 ggsave("../OUT/figures/simulationSummary.png", 
        height = 100, width = 180, units = "mm", dpi = 600)

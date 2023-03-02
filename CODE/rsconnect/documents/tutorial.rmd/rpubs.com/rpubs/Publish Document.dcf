@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1003595/292dd10e3b6c40fb9a5ada352265abcb
+bundleId: https://api.rpubs.com/api/v1/document/1003595/292dd10e3b6c40fb9a5ada352265abcb
+url: http://rpubs.com/clanescher/1003595
+when: 1677270788.6054
+lastSyncTime: 1677270788.60541

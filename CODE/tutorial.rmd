@@ -1,0 +1,397 @@
+---
+title: "Conditional Prediction"
+author: "C. Lane Scher"
+date: "2023-02-07"
+output: html_document
+---
+
+This tutorial accompanies the manuscript titled "Conditional prediction as a framework to improve predictions, understand species relationships, and inform conservation" by C. Lane Scher, Sarah Roberts, Kevin Kraus, and James S. Clark.
+
+Here we present two examples using conditional prediction, first with simulated data, and then with data from the Breeding Bird Survey.
+
+The conditional prediction workflow uses several updates to the `gjam` package:
+
+-   `gjamPredict()` can now make predictions that are conditioned on information about other species
+
+-   `gjamConditionalParameters()` produces the parameters associated with conditional prediction, including the species coefficient matrix
+
+Start by loading `gjam` and `tidyverse` which will be used throughout this tutorial.
+
+```{r message=FALSE, warning=FALSE}
+library(gjam)
+library(tidyverse)
+```
+
+### Simulated data
+
+In the first example, we use simulated data. We use the gjam function `gjamSimData()` to simulate continuous data that we convert to continuous abundance data.
+
+```{r}
+set.seed(100)
+
+n <- 1000   # 1000 observations
+S <- 10     # 10 species
+Q <- 5      # 5 predictors
+
+sim <- gjamSimData(n = n, 
+                   S = S, 
+                   Q = Q,
+                   typeNames = 'CON') # simulate continuous data
+xdata <- sim$xdata
+ydata <- sim$ydata
+formula <- sim$formula
+
+# convert to continuous abundance
+ydata[ydata < 0] <- 0
+
+```
+
+We fit a GJAM with the simulated data
+
+```{r message=FALSE, warning=FALSE}
+ng <- 5000
+burnin <- ng/2
+
+modelList <- list(ng = ng, burnin = burnin, typeNames = "CA")
+out <- gjam(formula = formula, xdata, ydata, modelList)
+  
+```
+
+Now that we have the fitted model `out`, we can use it to predict. Here we'll compare in-sample traditional and conditional prediction. The in-sample traditional predictions are already contained in `out`.
+
+```{r}
+# out already contains in-sample traditional predictions
+trad <- out$prediction$ypredMu
+```
+
+To get the conditional predictions, we'll iteratively treat each species as the focal species and condition on all the other species. The data to condition on is contained in the `ydataCond` within the `newdata` argument. Any combination of species can be conditioned on by assigning this argument.
+
+```{r message=FALSE, warning=FALSE}
+# make a matrix to hold the predictions
+cond <- matrix(nrow = n, ncol = S)
+
+
+for (s in 1:S) {
+  
+  # for focal species s:
+  
+  # condition on all species except species s
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-s]
+  
+  # predict species s
+  new <- list(ydataCond = ydata[,condCols], nsim = 2000)
+  cond_pred <- gjamPredict(output = out, newdata = new)
+
+  cond[,s] <- cond_pred$sdList$yMu[,s]
+}
+
+colnames(cond) <- colnames(out$inputs$y)
+```
+
+We now have traditional predictions `trad`, conditional predictions `cond`, and true values `ydata`. We can plot them to visualize the improvement from conditioning. We'll put the true values on the x axis, traditional predictions in red, condition predictions in blue, and the one-to-one line in black.
+
+```{r}
+trad1 <- as.data.frame(trad) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) 
+
+cond1 <- as.data.frame(cond) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) 
+
+true1 <- as.data.frame(ydata) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) 
+
+all <- inner_join(true1, trad1, by = c("obs", "name")) %>%
+  inner_join(cond1, by = c("obs", "name"))
+colnames(all)[3:5] <- c("true", "trad", "cond")
+
+ggplot(all) +
+  geom_point(aes(x = true, y = trad), color = "firebrick", alpha = 0.5,
+              shape = 1) +
+  geom_point(aes(x = true, y = cond), color = "cadetblue", alpha = 0.5,
+              shape = 1) +
+  facet_wrap(~name) +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(x = "True", y = "Predicted") +
+  theme_bw()
+```
+
+From these plots we can see that for each species the conditional predictions fall more closely along the one-to-one line.
+
+To get a quantitative understanding of the improvements from conditioning, we can use the function `conditionComparison()` . Again, we're conditioning each focal species on all the others, but this can be changed with the `ydataCond` argument.
+
+```{r message=FALSE, warning=FALSE}
+
+# adjust predictions for effort
+truew <- out$inputs$y/out$inputs$effMat
+tradw <- trad/out$inputs$effMat
+condw <- cond/out$inputs$effMat
+  
+
+compare <- c()
+
+for (s in 1:S) {
+  
+  # for focal species s
+  
+  # get condCols and predCols
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-s]
+  
+  predCols <- colnames(out$inputs$y)[s]
+  
+  # get spe
+  coni <- (truew[,predCols] - condw[,predCols] )^2
+  unci <- (truew[,predCols] - tradw[,predCols] )^2
+  
+  # how many spe are greater for traditional prediction
+  umc  <- unci - coni
+  uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
+  
+  # get rmspe
+  rmspecond <- sqrt(mean(coni))
+  rmspetrad <- sqrt(mean(unci))
+  
+  
+  # add to compare dataframe
+  compare <- rbind(compare, c(rmspetrad, rmspecond, 
+                              (rmspetrad-rmspecond) * 100, uno))
+}
+colnames(compare) <- c("Unc RMSPE", "Con RMSPE", "Perc Diff", "Frac u > c")
+print(compare)
+
+```
+
+`compare` contains several metrics to evaluate the improvement that comes from conditioning:
+
+-   Unc RMSPE: RMSPE for unconditional prediction
+
+-   Con RMSPE: RMSPE for conditional prediction
+
+-   Perc Diff: percent difference between unconditional and conditional prediction (positive value indicates improvement from conditioning)
+
+-   Frac u \> c: fraction of unconditional predictions whose error is greater than the corresponding conditional predictions (value above 0.5 indicates improvement from conditioning)
+
+Across species, we see that conditional predictions are better than traditional prediction, in terms of both percent difference in RMSPE (Perc Diff) and in the percent of predictions that are improved by conditioning (Frac u \> c).
+
+Last, we can look at the relationships between abundances of species. We do this using `gjamConditionalParameters()`. Again, we iteratively treat each species as the focal species. Here, the species to condition on are entered in the `conditionOn` argument.
+
+```{r}
+speciesCoefficients <- c()
+
+for (s in 1:S) {
+  
+  # for focal species s:
+  
+  # condition on all species except species s
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-s]
+  
+  # compare predictions of species s
+  param <- gjamConditionalParameters(output = out, conditionOn = condCols, nsim = 2000)
+  Atab <- param$Atab %>%
+    mutate(condOn = condCols, # species conditioned on
+           predSpecies = colnames(out$inputs$y)[s])   # species predicted
+  
+  # add to compare dataframe
+  speciesCoefficients <- rbind(speciesCoefficients, Atab)
+}
+
+```
+
+In `speciesCoefficients$Estimate`, we can see the information added by each species conditioned on (`speciesCoefficients$condOn`) to each species predicted (`speciesCoefficients$predSpecies`).
+
+We can convert that to matrix form, where `speciesCoefMatrix[1,2]` is the information from `S2` added to predictions of `S1` (i.e., `S1` is predicted conditionally on `S2`).
+
+```{r}
+speciesCoefMatrix <- speciesCoefficients %>%
+  select(Estimate, condOn, predSpecies) %>%
+  pivot_wider(values_from = Estimate, names_from = condOn) %>%
+  select(predSpecies, S1, everything()) %>%
+  as.data.frame()
+rownames(speciesCoefMatrix) <- speciesCoefMatrix$predSpecies
+speciesCoefMatrix$predSpecies <- NULL
+
+print(speciesCoefMatrix)
+```
+
+### Real data
+
+Now we'll work through an example using real data from the [Breeding Bird Survey](https://www.pwrc.usgs.gov/bbs/) (BBS). You can download the process BBS data and covariates from (XX).
+
+First, load the data and fit a gjam. Change `pathToData` to wherever you saved the downloaded data.
+
+```{r message=FALSE, warning=FALSE}
+pathToData <- "X:/conditionalPrediction/DATA/birds/"
+
+# load data
+load(paste0(pathToData, "covar.rdata"))
+load(paste0(pathToData, "counts.rdata"))
+
+# inner join to get sites where we have counts and covariates
+all <- counts %>%
+  inner_join(covar, by = "idYear")
+
+# separate x and y
+y <- all[,2:18]
+x <- all[,c(1, 19, 27:28, 20:25, 29, 46:53)]
+
+# formula
+formulaI <- as.formula(~ elevation + 
+                         prcpMean + prcpAnom +
+                         tminMean + tminAnom +
+                         forest + developed + water + wetlands + planted + shrub + herbaceous)
+
+# set up gjam
+effort <- list(columns=1:ncol(y), values = 150) # 150 minutes per BBS route
+
+ng <- 3000
+burnin <- ng/2
+ml   <- list(ng = ng, burnin = burnin, typeNames = "DA", 
+             effort = effort)
+
+# run gjam
+out <- gjam(formulaI, xdata = x, ydata = y, modelList = ml)
+
+```
+
+We can look at the predictions, comparing traditional to conditional predictions. We'll just look at a few of the species (those listed in `spUse`).
+
+```{r message=FALSE, warning=FALSE}
+spUse <- c("kirtlandswarbler", "chippingsparrow", "brownheadedcowbird")
+
+### traditional prediction
+trad <- out$prediction$ypredMu
+
+
+### conditional prediction
+# make a matrix to hold the predictions
+cond <- matrix(nrow = nrow(out$inputs$xdata), ncol = length(spUse))
+
+for (s in 1:length(spUse)) {
+  
+  # condition on all species except species s
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-grep(spUse[s], condCols)]
+  
+  # predict species s
+  new <- list(ydataCond = out$inputs$y[,condCols], nsim = 2000)
+  cond_pred <- gjamPredict(output = out, newdata = new)
+
+  cond[,s] <- cond_pred$sdList$yMu[,spUse[s]]
+}
+
+colnames(cond) <- spUse
+```
+
+Plot it.
+
+```{r}
+trad1 <- as.data.frame(trad) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) %>%
+  filter(name %in% spUse)
+
+cond1 <- as.data.frame(cond) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) 
+
+true1 <- as.data.frame(y) %>%
+  mutate(obs = 1:nrow(out$prediction$ypredMu)) %>%
+  pivot_longer(!obs) %>%
+  mutate(name = gsub(" |'|-", "", name)) %>%
+  filter(name %in% spUse)
+
+all <- inner_join(true1, trad1, by = c("obs", "name")) %>%
+  inner_join(cond1, by = c("obs", "name"))
+colnames(all)[3:5] <- c("true", "trad", "cond")
+
+ggplot(all) +
+  geom_point(aes(x = true, y = trad), color = "firebrick", alpha = 0.5,
+              shape = 1) +
+  geom_point(aes(x = true, y = cond), color = "cadetblue", alpha = 0.5,
+              shape = 1) +
+  facet_wrap(~name, scales = "free") +
+  geom_abline(slope = 1, intercept = 0) +
+  labs(x = "True", y = "Predicted") +
+  theme_bw()
+```
+
+Quantify the improvement from conditioning.
+
+```{r message=FALSE, warning=FALSE}
+
+# adjust predictions for effort
+truew <- out$inputs$y/out$inputs$effMat
+tradw <- trad/out$inputs$effMat
+condw <- cond/out$inputs$effMat[,grep(spUse, colnames(out$inputs$effMat))]
+ 
+
+compare <- c()
+for (s in 1:length(spUse)) {
+  
+  # get condCols and predCols
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-grep(spUse[s], condCols)]
+  
+  predCols <- spUse[s]
+  
+  # get spe
+  coni <- (truew[,predCols] - condw[,predCols] )^2
+  unci <- (truew[,predCols] - tradw[,predCols] )^2
+  
+  # how many spe are greater for traditional prediction
+  umc  <- unci - coni
+  uno  <- length(which(umc > 0))/length(umc)  # fraction larger error in uncon
+  
+  # get rmspe
+  rmspecond <- sqrt(mean(coni))
+  rmspetrad <- sqrt(mean(unci))
+  
+  
+  # add to compare dataframe
+  compare <- rbind(compare, c(rmspetrad, rmspecond, 
+                              (rmspetrad-rmspecond) * 100, uno))
+}
+colnames(compare) <- c("Unc RMSPE", "Con RMSPE", "Perc Diff", "Frac u > c")
+print(compare)
+```
+
+Finally, look at the species coefficients.
+
+```{r message=FALSE, warning=FALSE}
+
+speciesCoefficients <- c()
+for (s in 1:length(spUse)) {
+  
+  # condition on all species except species s
+  condCols <- colnames(out$inputs$y)
+  condCols <- condCols[-grep(spUse[s], condCols)]
+  
+  # compare predictions of species s
+  param <- gjamConditionalParameters(output = out, conditionOn = condCols, nsim = 2000)
+  Atab <- param$Atab %>%
+    mutate(condOn = condCols, # species conditioned on
+           predSpecies = spUse[s])   # species predicted
+  
+  # add to compare dataframe
+  speciesCoefficients <- rbind(speciesCoefficients, Atab)
+}
+
+# keep only species of interest (those in spUse)
+speciesCoefficients <- speciesCoefficients %>%
+  filter(condOn %in% spUse)
+
+speciesCoefMatrix <- speciesCoefficients %>%
+  select(Estimate, condOn, predSpecies) %>%
+  pivot_wider(values_from = Estimate, names_from = condOn)%>%
+  select(predSpecies, spUse[1], everything()) %>%
+  as.data.frame()
+rownames(speciesCoefMatrix) <- speciesCoefMatrix$predSpecies
+speciesCoefMatrix$predSpecies <- NULL
+
+print(speciesCoefMatrix)
+```
