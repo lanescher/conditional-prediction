@@ -422,7 +422,8 @@ all$type1 <- factor(all$type1, levels = c("Continuous", "Continuous abundance",
                                          "Discrete abundance", "Presence-absence"))
 
 #save(all, file = "../OUT/simulation.rdata")
-load("../OUT/simulation.rdata")
+load("OUT/simulation.rdata")
+
 
 all$type1 <- factor(all$type, levels = c("CON", "CA", "DA", "PA"))
 
@@ -490,7 +491,7 @@ e <- bottom +
   geom_boxplot(data = filter(all, covSp == 1),
                aes(x = type1, fill = type1, color = type1,
                    y = (`Frac u > c`)*100)) +
-  labs(y = "")
+  labs(y = "", x = "Data type")
 
 f <- bottom +
   geom_boxplot(data = filter(all, covSp == 0),
@@ -505,7 +506,7 @@ ggpubr::ggarrange(a, b, c, d, e, f,
           font.label = list(size = 10),
           heights = c(1.2, 1))
 
-ggsave("../OUT/figures/simulationSummary.png", 
+ggsave("OUT/figures/simulationSummary.png", 
        height = 100, width = 180, units = "mm", dpi = 600)
 
 

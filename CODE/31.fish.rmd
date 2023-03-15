@@ -338,7 +338,7 @@ a <- ggplot() +
         axis.text.y = element_text(size = 9),
         axis.title = element_text(size = 9),
         legend.position = "none") +
-  labs(x = "", y = "")
+  labs(x = "", y = "Comparison metrics")
   
 
 
@@ -473,9 +473,9 @@ strat_sub$value[which(strat_sub$value < -1000)] <- -1000
 
 
 
-base <- ggplot() + 
+base1 <- ggplot() + 
   geom_sf(data = world) + 
-  labs(fill = "Atlantic cod biomass (kg/km2)")+
+  labs(fill = "Atlantic cod \nbiomass (kg/km2)")+
   theme_bw() +
   theme(panel.grid = element_blank(),
         strip.background = element_blank(),
@@ -486,21 +486,48 @@ base <- ggplot() +
         axis.text = element_text(size = 9),
         plot.margin = margin(5, 1, 3, 1),
         legend.key.height = unit(.5, "cm"),
-        legend.key.width = unit(1.1, "cm"),
+        legend.key.width = unit(.5, "cm"),
         legend.title = element_text(size = 9,
                                     hjust = 0.5),
-        legend.direction = "horizontal",
+        legend.direction = "vertical",
         legend.text= element_text(size = 9)) +
-  scale_fill_gradient2(low = "darkblue", high = "red4", mid = "white", 
-                      midpoint = 0, breaks = c(-1000,0,1000,2000),
-                      limits = c(-1000, 2000),
+  scale_fill_gradientn(colors = c("white", "yellow", "firebrick2"), 
+                      #midpoint = 0, breaks = c(-1000,0,1000,2000),
+                      #limits = c(-1000, 2000),
                       guide = guide_colorbar(title.position = "top")) +
   scale_y_continuous(breaks = c(40, 43, 46)) +
   scale_x_continuous(breaks = c(-66, -70, -74))
 
+base2 <- ggplot() + 
+  geom_sf(data = world) + 
+  labs(fill = "Difference in \nbiomass (kg/km2)")+
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(hjust = 0),
+        plot.title = element_text(size = 9,
+                             hjust = 0.5),
+        axis.title = element_blank(),
+        axis.text = element_text(size = 9),
+        plot.margin = margin(0, 1, 3, 1),
+        legend.key.height = unit(.5, "cm"),
+        legend.key.width = unit(.5, "cm"),
+        legend.title = element_text(size = 9,
+                                    hjust = 0.5,
+                                    vjust = 1),
+        legend.direction = "vertical",
+        legend.text = element_text(size = 9)) +
+  scale_fill_gradient2(low = "darkblue", high = "red4", mid = "white", 
+                      midpoint = 0, breaks = c(-1000,0,1000,2000),
+                      limits = c(-1000, 2000),
+                      guide = guide_colorbar(title.position = "top")) +
+  scale_y_continuous(breaks = c(40, 43, 46),
+                     labels = c("     ", "     ", "     ")) +
+  scale_x_continuous(breaks = c(-66, -70, -74),
+                     labels = c("", "", ""))
 
 
-a <- base +
+a <- base1 +
   geom_sf(data = filter(strat_sub, 
                         strat_sub$spp == "ATLANTIC.COD",
                         strat_sub$year == 2012,
@@ -509,33 +536,51 @@ a <- base +
   coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
   labs(title = "Observed")
   
-b <- base +
+b <- base2 +
   geom_sf(data = filter(strat_sub, 
                         strat_sub$spp == "ATLANTIC.COD",
                         strat_sub$year == 2012,
                         name == "sub_uncon"),
           aes(group = as.factor(value), fill = value)) +
   coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
-  labs(title = "Traditional Prediction - Observed") +
-  theme(axis.text = element_blank())
+  labs(title = "Error from traditional prediction") #+
+  #theme(axis.text = element_blank())
   
-c <- base +
+c <- base2 +
   geom_sf(data = filter(strat_sub, 
                         strat_sub$spp == "ATLANTIC.COD",
                         strat_sub$year == 2012,
                         name == "sub_con"),
           aes(group = as.factor(value), fill = value)) +
   coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
-  labs(title = "Conditional Prediction - Observed") +
-  theme(axis.text = element_blank())
-  
+  labs(title = "Error from conditional prediction") #+
+  #theme(axis.text = element_blank())
+
+
+
+### I can't get panels lined up if they have separate legends, so I'm
+#   arranging this manually :(
+
+# this makes the figure with panels aligned
 ggpubr::ggarrange(a, b, c, ncol = 1,
-                  labels = "auto", common.legend = T,
+                  labels = "auto", 
                   label.y = 1.01, label.x = 0.15,
-                  legend = "top",
+                  legend = "none",
                   font.label = list(size = 10),
                   align = "hv")
 
 ggsave("../OUT/figures/codmaps.png", width = 80, height=180, units=c("mm"), 
        dpi = 600)
+
+# this makes the legends
+top <- ggpubr::ggarrange(a, labels = "a", legend = "right")
+bottom <- ggpubr::ggarrange(b, c, labels = c("b", "c"), 
+                            legend = "right", ncol = 1,
+                            common.legend = T)
+
+ggpubr::ggarrange(top, bottom, ncol = 1, heights = c(1, 2))
+
+ggsave("../OUT/figures/codmaps-legends.png", width = 80, height=180, units=c("mm"), 
+       dpi = 600)
+
 ```
