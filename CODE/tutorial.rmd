@@ -5,7 +5,7 @@ date: "2023-02-07"
 output: html_document
 ---
 
-This tutorial accompanies the manuscript titled "Conditional prediction as a framework to improve predictions, understand species relationships, and inform conservation" by C. Lane Scher, Sarah Roberts, Kevin Kraus, and James S. Clark.
+This tutorial accompanies the manuscript titled "Leveraging relationships between species abundances to improve predictions and inform conservation" by C. Lane Scher, Sarah Roberts, Kevin Kraus, and James S. Clark.
 
 Here we present two examples using conditional prediction, first with simulated data, and then with data from the Breeding Bird Survey.
 
@@ -46,7 +46,7 @@ ydata[ydata < 0] <- 0
 
 ```
 
-We fit a GJAM with the simulated data
+We fit a GJAM with the simulated data. Note: `ng` and `burnin` are parameters for the Gibbs sampler. `ng` specifies the number of Gibbs steps, and `burnin` specifies the number of steps to discard. We selected these values for save time; a real analysis should use higher values to ensure convergence.  
 
 ```{r message=FALSE, warning=FALSE}
 ng <- 5000
@@ -89,7 +89,7 @@ for (s in 1:S) {
 colnames(cond) <- colnames(out$inputs$y)
 ```
 
-We now have traditional predictions `trad`, conditional predictions `cond`, and true values `ydata`. We can plot them to visualize the improvement from conditioning. We'll put the true values on the x axis, traditional predictions in red, condition predictions in blue, and the one-to-one line in black.
+We now have traditional predictions `trad`, conditional predictions `cond`, and true values `ydata`. We can plot them to visualize the improvement from conditioning. We'll put the true values on the x axis, traditional predictions in red, conditional predictions in blue, and the one-to-one line in black.
 
 ```{r}
 trad1 <- as.data.frame(trad) %>%
@@ -220,7 +220,7 @@ print(speciesCoefMatrix)
 
 ### Real data
 
-Now we'll work through an example using real data from the [Breeding Bird Survey](https://www.pwrc.usgs.gov/bbs/) (BBS). You can download the process BBS data and covariates from (XX).
+Now we'll work through an example using real data from the [Breeding Bird Survey](https://www.pwrc.usgs.gov/bbs/) (BBS). You can download the processed BBS data and covariates from (XX).
 
 First, load the data and fit a gjam. Change `pathToData` to wherever you saved the downloaded data.
 
@@ -320,6 +320,8 @@ ggplot(all) +
   theme_bw()
 ```
 
+We can see, especially for the cowbird and chipping sparrow, that traditional predictions (red) fall around the mean value, whereas conditional predictions (blue) are much closer to the one-to-one line.
+
 Quantify the improvement from conditioning.
 
 ```{r message=FALSE, warning=FALSE}
@@ -360,6 +362,8 @@ colnames(compare) <- c("Unc RMSPE", "Con RMSPE", "Perc Diff", "Frac u > c")
 print(compare)
 ```
 
+Positive `Perc Diff` and `Frac u > c` over 0.5 indicate that conditioning improves prediction for all three species.
+
 Finally, look at the species coefficients.
 
 ```{r message=FALSE, warning=FALSE}
@@ -395,3 +399,8 @@ speciesCoefMatrix$predSpecies <- NULL
 
 print(speciesCoefMatrix)
 ```
+
+Recall that `speciesCoefMatrix[1,2]` is the information from `S2` added to predictions of `S1` (i.e., `S1` is predicted conditionally on `S2`). For example, Kirtland's Warblers indicate very few (-5.9) cowbirds.
+
+
+
