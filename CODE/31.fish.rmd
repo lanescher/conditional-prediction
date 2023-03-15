@@ -564,7 +564,7 @@ c <- base2 +
 # this makes the figure with panels aligned
 ggpubr::ggarrange(a, b, c, ncol = 1,
                   labels = "auto", 
-                  label.y = 1.01, label.x = 0.15,
+                  label.y = 1, label.x = 0.15,
                   legend = "none",
                   font.label = list(size = 10),
                   align = "hv")
