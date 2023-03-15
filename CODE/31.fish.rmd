@@ -468,8 +468,8 @@ strat_sub$name1 <- as.factor(strat_sub$name)
 
 
 # just for the maps, set limits at 2000 and -1000
-strat_sub$value[which(strat_sub$value > 2000)] <- 2000
-strat_sub$value[which(strat_sub$value < -1000)] <- -1000
+# strat_sub$value[which(strat_sub$value > 2000)] <- 2000
+# strat_sub$value[which(strat_sub$value < -1000)] <- -1000
 
 
 
@@ -519,7 +519,7 @@ base2 <- ggplot() +
         legend.text = element_text(size = 9)) +
   scale_fill_gradient2(low = "darkblue", high = "red4", mid = "white", 
                       midpoint = 0, breaks = c(-1000,0,1000,2000),
-                      limits = c(-1000, 2000),
+                      limits = c(-1050, 2000),
                       guide = guide_colorbar(title.position = "top")) +
   scale_y_continuous(breaks = c(40, 43, 46),
                      labels = c("     ", "     ", "     ")) +
