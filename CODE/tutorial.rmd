@@ -220,7 +220,7 @@ print(speciesCoefMatrix)
 
 ### Real data
 
-Now we'll work through an example using real data from the [Breeding Bird Survey](https://www.pwrc.usgs.gov/bbs/) (BBS). You can download the processed BBS data and covariates from (XX).
+Now we'll work through an example using real data from the [Breeding Bird Survey](https://www.pwrc.usgs.gov/bbs/) (BBS). You can download the processed BBS data and covariates from our [GitHub repository](https://github.com/lanescher/conditional-prediction/tree/main/DATA/birds).
 
 First, load the data and fit a gjam. Change `pathToData` to wherever you saved the downloaded data.
 
@@ -228,16 +228,9 @@ First, load the data and fit a gjam. Change `pathToData` to wherever you saved t
 pathToData <- "X:/conditionalPrediction/DATA/birds/"
 
 # load data
-load(paste0(pathToData, "covar.rdata"))
-load(paste0(pathToData, "counts.rdata"))
-
-# inner join to get sites where we have counts and covariates
-all <- counts %>%
-  inner_join(covar, by = "idYear")
-
-# separate x and y
-y <- all[,2:18]
-x <- all[,c(1, 19, 27:28, 20:25, 29, 46:53)]
+load(paste0(pathToData, "birdData.rdata"))
+x <- xdata
+y <- ydata
 
 # formula
 formulaI <- as.formula(~ elevation + 
