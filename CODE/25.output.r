@@ -131,6 +131,76 @@ ggsave(file = "../OUT/figures/Amatrix.png", height = 120, width = 80,
 
 
 
+### now see if there are more or less cowbirds at focal species sites
+
+#conditionOn <- "kirtlandswarbler"
+#conditionOnData <- select(as.data.frame(ydata), all_of(conditionOn))
+conditionOnData <- ydata[,-which(colnames(ydata) == "brownheadedcowbird")]
+
+newdata <- list(ydataCond = conditionOnData,  nsim = 500)
+cond_pred <- gjamPredict(output = out, newdata = newdata)
+cond_pred1 <- as.data.frame(cond_pred$sdList$yMu)
+
+
+cowKirtPres <- cond_pred1 %>%
+  filter(kirtlandswarbler > 0) %>%
+  mutate(group = "Kirtland's Warbler \npresent")
+mean(cowKirtPres$brownheadedcowbird)
+
+cowBellPres <- cond_pred1 %>%
+  filter(bellsvireo > 0) %>%
+  mutate(group = "Bell's Vireo \npresent")
+mean(cowBellPres$brownheadedcowbird)
+
+cowAll <- cond_pred1 %>%
+  mutate(group = "All")
+mean(cowAll$brownheadedcowbird)
+
+all <- bind_rows(cowKirtPres, cowBellPres) %>%
+  bind_rows(cowAll)
+
+trad_pred <- cond_pred1 %>%
+  mutate(`brownheadedcowbird` = out$prediction$ypredMu[,"brownheadedcowbird"])
+
+cowKirtPres1 <- trad_pred %>%
+  filter(kirtlandswarbler > 0) %>%
+  mutate(group = "Kirtland's Wabler \npresent")
+mean(cowKirtPres1$brownheadedcowbird)
+
+cowBellPres1 <- trad_pred %>%
+  filter(bellsvireo > 0) %>%
+  mutate(group = "Bell's Vireo \npresent")
+mean(cowBellPres1$brownheadedcowbird)
+
+cowAll1 <- trad_pred %>%
+  mutate(group = "All")
+mean(cowAll1$brownheadedcowbird)
+
+all1 <- bind_rows(cowKirtPres1, cowBellPres1) %>%
+  bind_rows(cowAll1)
+
+a <- ggplot(all1) +
+  geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
+  scale_fill_manual(values = c("gray", "brown", "yellow")) +
+  theme_bw() +
+  labs(x = "Observations", y = "Brown-headed Cowbird \nabundance", fill = "") +
+  coord_cartesian(ylim = c(0, 45))
+
+b <- ggplot(all) +
+  geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
+  scale_fill_manual(values = c("gray", "brown", "yellow")) +
+  theme_bw() +
+  labs(x = "Observations", y = "", fill = "") +
+  coord_cartesian(ylim = c(0, 45))
+
+
+ggpubr::ggarrange(a, b, nrow = 1, legend = "none",
+                  labels = "auto", align = "hv")
+
+ggsave(file = "../OUT/figures/predictedAbundance.jpg",
+       height = 5, width = 10)
+
+
 
 # 2. which/how many species are best to condition on ----
 load("../OUT/birds-gjamOutput.rdata")
@@ -351,195 +421,295 @@ ggsave(file = "../OUT/figures/conditionOn.png", height = 140, width = 80,
 
 
 
-# ### see which species decline as more incidental species are added
-# 
-# numSp <- all %>%
-#   filter(predOn %in% c(1, 16),
-#          cat == "frac") %>%
-#   select(species, predOn, Mean) %>%
-#   pivot_wider(values_from = "Mean",
-#               names_from = "predOn") %>%
-#   mutate(diff = `16` - `1`) %>%
-#   inner_join(percZero, by = "species")
-# # if diff is negative, predictions get worse as numSp increases
-# print(numSp)
-# 
-# 
-# 
-# 
-# ### see what's going on with rare species ----
-# 
-# library(gjam)
-# library(tidyverse)
-# library(patchwork)
-# 
-# #predSp <- c('kirtlandswarbler', 'redwingedblackbird')
-# 
-# load("X:/conditionalPrediction/OUT/birds-gjamOutput.rdata")
-# ydata <- out$inputs$y
-# predSp <- colnames(ydata)
-# 
-# predsAll <- c()
-# for (s in 1:length(predSp)) {
-#   pred <- predSp[s]
-#   sp <- colnames(ydata)
-#   sp <- sp[-grep(pred, sp)]
-# 
-# 
-#   # pick species combos to condition on
-#   condOn1 <- combn(sp, 1)
-#   condOn5 <- combn(sp, 5)
-# 
-# 
-#   for (i in 1:5) {
-#     # condition on all species
-#     ydataCond <- select(as.data.frame(ydata), !all_of(pred))
-#     newdata <- list(ydataCond = ydataCond, nsim = 300)
-#     c      <- gjamPredict(out, newdata = newdata)
-#     c <- c$sdList$yMu[,pred]
-# 
-#     # condition on 5 species
-#     condOn <- condOn5[,i]
-#     ydataCond <- select(as.data.frame(ydata), all_of(condOn))
-#     newdata <- list(ydataCond = ydataCond, nsim = 300)
-#     c5      <- gjamPredict(out, newdata = newdata)
-#     c5 <- c5$sdList$yMu[,pred]
-# 
-# 
-#     # condition on one species
-#     condOn <- condOn1[,i]
-#     ydataCond <- select(as.data.frame(ydata), all_of(condOn))
-#     newdata <- list(ydataCond = ydataCond, nsim = 300)
-#     c1      <- gjamPredict(out, newdata = newdata)
-#     c1 <- c1$sdList$yMu[,pred]
-# 
-#     # traditionanl prediction
-#     t <- out$prediction$ypredMu[,pred]
-# 
-#     all1 <- data.frame(species = pred,
-#                        obs = 1:nrow(out$inputs$y),
-#                        combo = i,
-#                        count = out$inputs$y[,pred],
-#                        trad = t,
-#                        cond1 = c1,
-#                        cond5 = c5,
-#                        condall = c) %>%
-#       pivot_longer(cols = c("trad", "cond1", "cond5", "condall"))
-# 
-#     predsAll <- bind_rows(predsAll,  all1)
-#   }
-# 
-# }
-# 
-# predsAll <- predsAll %>%
-#   mutate(Name = case_when(name == "trad" ~ "Traditional",
-#                           name == "cond1" ~ "Conditioned on 1 species",
-#                           name == "cond5" ~ "Conditioned on 5 species",
-#                           name == "condall" ~ "Conditioned on all other species"))
-# predsAll$Name <- factor(predsAll$Name, levels = c("Traditional", "Conditioned on 1 species", 
-#                                         'Conditioned on 5 species', "Conditioned on all other species"))
-# 
-# all1 <- predsAll %>%
-#   pivot_wider(values_from = value, names_from = name,
-#               id_cols = c("species", "count", "combo", "obs")) %>%
-#   mutate(count1 = count) %>%
-#   pivot_longer(cols = c(count1, trad, cond1, cond5, condall)) %>%
-#   inner_join(percZero, by = "species")
-# 
-# 
-# # get rmspes for when obs = 0 and obs > 0
-# rmspes <- matrix(nrow = (length(colnames(ydata)))*2,
-#                  ncol = 6)
-# for (s in 1:length(colnames(ydata))) {
-#   sp <- colnames(ydata)[s]
-#   
-#   obs0 <- all1 %>%
-#     filter(species == sp,
-#            name == "count1",
-#            count == 0)
-#   pred0_trad <- all1 %>%
-#     filter(species == sp,
-#            name == "trad",
-#            count == 0)
-#   pred0_cond1 <- all1 %>%
-#     filter(species == sp,
-#            name == "cond1",
-#            count == 0)
-#   pred0_cond5 <- all1 %>%
-#     filter(species == sp,
-#            name == "cond5",
-#            count == 0)
-#   pred0_condall <- all1 %>%
-#     filter(species == sp,
-#            name == "condall",
-#            count == 0)
-#   
-#   rmspes[s,1] <- sp
-#   rmspes[s,2] <- RMSE_func(pred0_trad$value, obs0$value)
-#   rmspes[s,3] <- RMSE_func(pred0_cond1$value, obs0$value)
-#   rmspes[s,4] <- RMSE_func(pred0_cond5$value, obs0$value)
-#   rmspes[s,5] <- RMSE_func(pred0_condall$value, obs0$value)
-#   rmspes[s,6] <- "Count = 0"
-#   
-#   obs1 <- all1 %>%
-#     filter(species == sp,
-#            name == "count1",
-#            count > 0)
-#   pred1_trad <- all1 %>%
-#     filter(species == sp,
-#            name == "trad",
-#            count > 0)
-#   pred1_cond1 <- all1 %>%
-#     filter(species == sp,
-#            name == "cond1",
-#            count > 0)
-#   pred1_cond5 <- all1 %>%
-#     filter(species == sp,
-#            name == "cond5",
-#            count > 0)
-#   pred1_condall <- all1 %>%
-#     filter(species == sp,
-#            name == "condall",
-#            count > 0)
-#   
-#   rmspes[17+s,1] <- sp
-#   rmspes[17+s,2] <- RMSE_func(pred1_trad$value, obs1$value)
-#   rmspes[17+s,3] <- RMSE_func(pred1_cond1$value, obs1$value)
-#   rmspes[17+s,4] <- RMSE_func(pred1_cond5$value, obs1$value)
-#   rmspes[17+s,5] <- RMSE_func(pred1_condall$value, obs1$value)
-#   rmspes[17+s,6] <- "Count > 0"
-#   
-#   
-#   
-# }
-# colnames(rmspes) <- c("species", "trad", "cond1", "cond5", 'condall', "group")
-# 
-# percZero <- out$inputs$y
-# percZero[percZero == 0] <- 1
-# percZero <- colMeans(percZero)
-# 
-# percZero <- data.frame(species = names(percZero),
-#                        percZero = percZero)
-# 
-# rmspes1 <- as.data.frame(rmspes) %>%
-#   pivot_longer(!all_of(c('species', "group"))) %>%
-#   mutate(value = as.numeric(value)) %>%
-#   inner_join(percZero, by = "species")
-# 
-# 
-# ggplot(rmspes1) +
-#   geom_point(aes(x = factor(name, levels = c("trad", 'cond1', "cond5", "condall")),
-#                  y = log(value), color = percZero)) +
-#   geom_line(aes(x = factor(name, levels = c("trad", 'cond1', "cond5", "condall")),
-#                 y = log(value), color = percZero, group = species)) +
-#   facet_wrap(~group, scales = "free") +
-#   scale_x_discrete(labels = c("trad", "1", "5", "all")) +
-#   scale_color_gradientn(values = c(0, 1),
-#                         colors = c('blue', "orange"),
-#                         guide = "none") +
-#   theme_bw() +
-#   theme() +
-#   labs(x = "Prediction Type", y = "Log(RMSPE)", color = "")
-# 
-# ggsave(file = "OUT/figures/rmspes.jpg", height = 4, width = 8)
+### see which species decline as more incidental species are added
 
+numSp <- all %>%
+  filter(predOn %in% c(1, 16),
+         cat == "frac") %>%
+  select(species, predOn, Mean) %>%
+  pivot_wider(values_from = "Mean",
+              names_from = "predOn") %>%
+  mutate(diff = `16` - `1`) %>%
+  inner_join(percZero, by = "species")
+# if diff is negative, predictions get worse as numSp increases
+print(numSp)
+
+plot(numSp$percZero, numSp$diff)
+
+
+
+### see what's going on with rare species ----
+RMSE_func <- function(preds, actual){
+  return(sqrt(mean((actual - preds)^2)))
+}
+
+
+library(gjam)
+library(tidyverse)
+library(patchwork)
+
+#predSp <- c('kirtlandswarbler', 'redwingedblackbird')
+
+load("X:/conditionalPrediction/OUT/birds-gjamOutput.rdata")
+ydata <- out$inputs$y
+predSp <- colnames(ydata)
+
+predsAll <- c()
+for (s in 1:length(predSp)) {
+  pred <- predSp[s]
+  sp <- colnames(ydata)
+  sp <- sp[-grep(pred, sp)]
+
+
+  # pick species combos to condition on
+  condOn1 <- combn(sp, 1)
+  condOn5 <- combn(sp, 5)
+
+
+  for (i in 1:5) {
+    # condition on all species
+    ydataCond <- select(as.data.frame(ydata), !all_of(pred))
+    newdata <- list(ydataCond = ydataCond, nsim = 300)
+    c      <- gjamPredict(out, newdata = newdata)
+    c <- c$sdList$yMu[,pred]
+
+    # condition on 5 species
+    condOn <- condOn5[,i]
+    ydataCond <- select(as.data.frame(ydata), all_of(condOn))
+    newdata <- list(ydataCond = ydataCond, nsim = 300)
+    c5      <- gjamPredict(out, newdata = newdata)
+    c5 <- c5$sdList$yMu[,pred]
+
+
+    # condition on one species
+    condOn <- condOn1[,i]
+    ydataCond <- select(as.data.frame(ydata), all_of(condOn))
+    newdata <- list(ydataCond = ydataCond, nsim = 300)
+    c1      <- gjamPredict(out, newdata = newdata)
+    c1 <- c1$sdList$yMu[,pred]
+
+    # traditionanl prediction
+    t <- out$prediction$ypredMu[,pred]
+
+    all1 <- data.frame(species = pred,
+                       obs = 1:nrow(out$inputs$y),
+                       combo = i,
+                       count = out$inputs$y[,pred],
+                       trad = t,
+                       cond1 = c1,
+                       cond5 = c5,
+                       condall = c) %>%
+      pivot_longer(cols = c("trad", "cond1", "cond5", "condall"))
+
+    predsAll <- bind_rows(predsAll,  all1)
+  }
+
+}
+
+predsAll <- predsAll %>%
+  mutate(Name = case_when(name == "trad" ~ "Traditional",
+                          name == "cond1" ~ "Conditioned on 1 species",
+                          name == "cond5" ~ "Conditioned on 5 species",
+                          name == "condall" ~ "Conditioned on all other species"))
+predsAll$Name <- factor(predsAll$Name, levels = c("Traditional", "Conditioned on 1 species",
+                                        'Conditioned on 5 species', "Conditioned on all other species"))
+
+all1 <- predsAll %>%
+  pivot_wider(values_from = value, names_from = name,
+              id_cols = c("species", "count", "combo", "obs")) %>%
+  mutate(count1 = count) %>%
+  pivot_longer(cols = c(count1, trad, cond1, cond5, condall)) %>%
+  inner_join(percZero, by = "species")
+
+
+# get % obs improved for obs = 0 and obs > 0
+percImpr <- c()
+for (s in 1:length(colnames(ydata))) {
+  sp <- colnames(ydata)[s]
+  
+  tmp <- all1 %>%
+    filter(species == sp) %>%
+    mutate(diff = (value - count)^2) %>%
+    select(species, combo, obs, name, diff) %>%
+    pivot_wider(names_from = "name",
+                values_from = "diff") %>%
+    pivot_longer(cols = c(cond1, cond5, condall)) %>%
+    mutate(impr = trad - value,
+           better = case_when(impr > 0 ~ 1,
+                              T ~ 0)) %>%
+    group_by(name, combo) %>%
+    summarize(percImpr = mean(better)) %>%
+    group_by(name) %>%
+    summarize(percImprSe = sd(percImpr)/sqrt(5),
+              percImpr = mean(percImpr)) %>%
+    mutate(group = 'All',
+           species = sp)
+  
+  percImpr <- bind_rows(percImpr, tmp)
+  
+  tmp <- all1 %>%
+    filter(species == sp,
+           count == 0) %>%
+    mutate(diff = (value - count)^2) %>%
+    select(species, combo, obs, name, diff) %>%
+    pivot_wider(names_from = "name",
+                values_from = "diff") %>%
+    pivot_longer(cols = c(cond1, cond5, condall)) %>%
+    mutate(impr = trad - value,
+           better = case_when(impr > 0 ~ 1,
+                              T ~ 0)) %>%
+    group_by(name, combo) %>%
+    summarize(percImpr = mean(better)) %>%
+    group_by(name) %>%
+    summarize(percImprSe = sd(percImpr)/sqrt(5),
+              percImpr = mean(percImpr)) %>%
+    mutate(group = 'Count = 0',
+           species = sp)
+  
+  percImpr <- bind_rows(percImpr, tmp)
+  
+  tmp <- all1 %>%
+    filter(species == sp,
+           count > 0) %>%
+    mutate(diff = (value - count)^2) %>%
+    select(species, combo, obs, name, diff) %>%
+    pivot_wider(names_from = "name",
+                values_from = "diff") %>%
+    pivot_longer(cols = c(cond1, cond5, condall)) %>%
+    mutate(impr = trad - value,
+           better = case_when(impr > 0 ~ 1,
+                              T ~ 0)) %>%
+    group_by(name, combo) %>%
+    summarize(percImpr = mean(better)) %>%
+    group_by(name) %>%
+    summarize(percImprSe = sd(percImpr)/sqrt(5),
+              percImpr = mean(percImpr)) %>%
+    mutate(group = 'Count > 0',
+           species = sp)
+  
+  percImpr <- bind_rows(percImpr, tmp)
+  
+}
+
+
+# get rmspes for when obs = 0 and obs > 0
+rmspes <- c()
+for (s in 1:length(colnames(ydata))) {
+  sp <- colnames(ydata)[s]
+  
+  tmp <- all1 %>%
+    filter(species == sp,
+           count == 0,
+           name != "count1") %>%
+    group_by(name, combo) %>%
+    summarize(rmspe = RMSE_func(value, count)) %>%
+    pivot_wider(values_from = rmspe, names_from = name) %>%
+    pivot_longer(!c("trad", "combo")) %>%
+    mutate(percDiff = (trad-value)/trad * 100) %>%
+    group_by(name) %>%
+    summarize(percDiffSe = sd(percDiff)/sqrt(5),
+              percDiff = mean(percDiff)) %>%
+    mutate(group = 'Count = 0',
+           species = sp)
+
+  rmspes <- bind_rows(rmspes, tmp)
+  
+  tmp <- all1 %>%
+    filter(species == sp,
+           count > 0,
+           name != "count1") %>%
+    group_by(name, combo) %>%
+    summarize(rmspe = RMSE_func(value, count)) %>%
+    pivot_wider(values_from = rmspe, names_from = name) %>%
+    pivot_longer(!c("trad", "combo")) %>%
+    mutate(percDiff = (trad-value)/trad * 100) %>%
+    group_by(name) %>%
+    summarize(percDiffSe = sd(percDiff)/sqrt(5),
+              percDiff = mean(percDiff)) %>%
+    mutate(group = 'Count > 0',
+           species = sp)
+  
+  rmspes <- bind_rows(rmspes, tmp)
+  
+  tmp <- all1 %>%
+    filter(species == sp,
+           name != "count1")  %>%
+    group_by(name, combo) %>%
+    summarize(rmspe = RMSE_func(value, count)) %>%
+    pivot_wider(values_from = rmspe, names_from = name) %>%
+    pivot_longer(!c("trad", "combo")) %>%
+    mutate(percDiff = (trad-value)/trad * 100) %>%
+    group_by(name) %>%
+    summarize(percDiffSe = sd(percDiff)/sqrt(5),
+              percDiff = mean(percDiff)) %>%
+    mutate(group = 'All',
+           species = sp)
+  
+  rmspes <- bind_rows(rmspes, tmp)
+  
+
+}
+#colnames(rmspes) <- c("species", "trad", "cond1", "cond5", 'condall', "group")
+
+percZero <- ydata
+percZero[percZero > 0] <- 1
+percZero <- colMeans(percZero)
+
+
+percZero <- data.frame(species = names(percZero),
+                       percZero = percZero)
+
+
+rmspes1 <- rmspes %>%
+  inner_join(percZero, by = "species")
+
+a <- ggplot(rmspes1) +
+  geom_hline(yintercept = 0) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = percDiff + percDiffSe, 
+                  ymin = percDiff - percDiffSe, group = species,
+                  fill = percZero), alpha = 0.4) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percDiff, color = percZero, group = species)) +
+  facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme() +
+  labs(x = "", y = "Percent improvement \nin RMSPE", 
+       color = "Percent \nnon-zero \nobservations") +
+  coord_cartesian(ylim = c(-27, 50))
+
+
+percImpr1 <- percImpr %>%
+  inner_join(percZero, by = "species")
+b <- ggplot(percImpr1) +
+  geom_hline(yintercept = 50) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = (percImpr + percImprSe)*100, 
+                  ymin = (percImpr - percImprSe)*100, group = species,
+                  fill = percZero), alpha = 0.4) +
+  # geom_point(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+  #                y = percImpr, color = percZero)) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percImpr*100, color = percZero, group = species)) +
+  facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme() +
+  labs(x = "Number of species conditioned on", y = "Percent of \npredictions improved", 
+       color = "Percent \nnon-zero \nobservations") +
+  coord_cartesian(ylim = c(0, 100))
+
+ggpubr::ggarrange(a, b, nrow = 2, common.legend = T, legend = "right")
+
+
+
+ggsave(file = "../OUT/figures/metrics-split.jpg", height = 8, width = 12)

@@ -215,7 +215,7 @@ compare_is <- compareEachSpecies(out_is, nsim = nsim)
 
 ```
 
-#3 plot it plot conditional and unconditional metrics together
+#3 plot it - plot conditional and unconditional metrics together
 
 ```{r}
 
