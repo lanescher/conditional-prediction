@@ -215,6 +215,23 @@ compare_is <- compareEachSpecies(out_is, nsim = nsim)
 
 ```
 
+
+# sidenote: For the two species that don't gain improvement from conditioning, are they fit in the model worse than other species?
+
+```{r}
+rmspe_is <- out_is$fit$rmspeBySpec
+rmspe_oos <- out_oos$fit$rmspeBySpec
+
+rmspe <- data.frame(species = names(rmspe_is),
+                    is = rmspe_is,
+                    oos = rmspe_oos)
+
+```
+
+
+
+
+
 #3 plot it - plot conditional and unconditional metrics together
 
 ```{r}
@@ -338,7 +355,7 @@ a <- ggplot() +
         axis.text.y = element_text(size = 9),
         axis.title = element_text(size = 9),
         legend.position = "none") +
-  labs(x = "", y = "Comparison metrics")
+  labs(x = "", y = "Percent improvement \n in RMSPE (blue) \n \n Percent of \npredictions improved (red)")
   
 
 
@@ -346,9 +363,9 @@ a <- ggplot() +
 ggpubr::ggarrange(a, b, nrow = 1,
                   labels = "auto",
                   widths = c(0.3, 1),
-                  label.x = c(0.04, 0.02), label.y = .95,
+                  label.x = c(0.38, 0), label.y = .95,
                   font.label = list(size = 10),
-                  align = "hv")
+                  align = "h")
 
 
 ggsave(filename = "../OUT/figures/metrics.png",
@@ -556,6 +573,21 @@ c <- base2 +
   labs(title = "Error from conditional prediction") #+
   #theme(axis.text = element_blank())
 
+# add panel comparing b and c? No.
+# tmp <- strat_sub %>%
+#   filter(name %in% c("sub_con", "sub_uncon"), 
+#                         strat_sub$spp == "ATLANTIC.COD",
+#                         strat_sub$year == 2012) %>%
+#   select(!c("conditional", "unconditional", "name")) %>%
+#   pivot_wider(names_from = "name1", values_from = "value") %>%
+#   mutate(diff = sub_uncon - sub_con)
+# 
+# d <- base2 +
+#   geom_sf(data = tmp,
+#           aes(fill = diff)) +
+#   coord_sf(xlim=c(-74, -65), ylim=c(40,46), expand = TRUE) +
+#   labs(title = "Traditional prediction error compared to \nconditional prediction error") #+
+#   #theme(axis.text = element_blank())
 
 
 ### I can't get panels lined up if they have separate legends, so I'm
