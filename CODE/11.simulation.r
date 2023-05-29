@@ -422,7 +422,7 @@ all$type1 <- factor(all$type1, levels = c("Continuous", "Continuous abundance",
                                          "Discrete abundance", "Presence-absence"))
 
 #save(all, file = "../OUT/simulation.rdata")
-load("OUT/simulation.rdata")
+load("../OUT/simulation.rdata")
 
 
 all$type1 <- factor(all$type, levels = c("CON", "CA", "DA", "PA"))
@@ -506,8 +506,16 @@ ggpubr::ggarrange(a, b, c, d, e, f,
           font.label = list(size = 10),
           heights = c(1.2, 1))
 
-ggsave("OUT/figures/simulationSummary.png", 
-       height = 100, width = 180, units = "mm", dpi = 600)
+
+ggpubr::ggarrange(a, b, c, nrow = 1,
+                  labels = "auto",
+                  label.x = c(0.1, 0.06, 0.06), 
+                  label.y = .93,
+                  font.label = list(size = 10),
+                  heights = c(1.2, 1))
+
+ggsave("../OUT/figures/simulationSummary.png", 
+       height = 60, width = 180, units = "mm", dpi = 600)
 
 
 
