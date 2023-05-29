@@ -453,8 +453,7 @@ top <- base  +
   coord_cartesian(ylim = c(-150, 100)) +
   labs(x = "", y = "Percent improvement \nin RMSPE", fill = "", color = "") +
   geom_hline(yintercept = 0, color = "black") +
-  theme(plot.margin = margin(15, 0.1, 0, 0.1),
-        axis.text.x = element_blank())
+  theme(plot.margin = margin(15, 0.1, 0, 0.1))
 
 bottom <- base  +
   coord_cartesian(ylim = c(0, 100)) +
@@ -474,7 +473,8 @@ b <- top +
   geom_boxplot(data = filter(all, covSp == 1),
                aes(x = type1, fill = type1, color = type1,
                    y = `Perc Diff`)) +
-  labs(y = "", title = "Residual covariance with \n1 species")
+  labs(x = "Data type", title = "Residual covariance with \n1 species",
+       y = "")
 
 c <- top +
   geom_boxplot(data = filter(all, covSp == 0),
