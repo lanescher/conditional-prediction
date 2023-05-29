@@ -185,14 +185,15 @@ cowAll <- cond_pred1 %>%
 mean(cowAll$brownheadedcowbird)
 
 all <- bind_rows(cowKirtPres, cowBellPres) %>%
-  bind_rows(cowAll)
+  bind_rows(cowAll) %>%
+  mutate(type = "cond")
 
 trad_pred <- cond_pred1 %>%
   mutate(`brownheadedcowbird` = out$prediction$ypredMu[,"brownheadedcowbird"])
 
 cowKirtPres1 <- trad_pred %>%
   filter(kirtlandswarbler > 0) %>%
-  mutate(group = "Kirtland's Wabler \npresent")
+  mutate(group = "Kirtland's Warbler \npresent")
 mean(cowKirtPres1$brownheadedcowbird)
 
 cowBellPres1 <- trad_pred %>%
@@ -205,28 +206,62 @@ cowAll1 <- trad_pred %>%
 mean(cowAll1$brownheadedcowbird)
 
 all1 <- bind_rows(cowKirtPres1, cowBellPres1) %>%
-  bind_rows(cowAll1)
+  bind_rows(cowAll1) %>%
+  mutate(type = "trad")
 
-a <- ggplot(all1) +
-  geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
-  scale_fill_manual(values = c("gray", "brown", "yellow")) +
+
+# now do observed
+cowKirtPres2 <- as.data.frame(ydata) %>%
+  filter(kirtlandswarbler > 0) %>%
+  mutate(group = "Kirtland's Warbler \npresent")
+mean(cowKirtPres2$brownheadedcowbird)
+
+cowBellPres2 <- as.data.frame(ydata) %>%
+  filter(bellsvireo > 0) %>%
+  mutate(group = "Bell's Vireo \npresent")
+mean(cowBellPres2$brownheadedcowbird)
+
+cowAll2 <- as.data.frame(ydata) %>%
+  mutate(group = "All")
+mean(cowAll2$brownheadedcowbird)
+
+all2 <- bind_rows(cowKirtPres2, cowBellPres2) %>%
+  bind_rows(cowAll2) %>%
+  mutate(type = "obs")
+
+
+alla <- bind_rows(all, all1, all2)
+alla$type <- factor(alla$type, levels = c("obs", "trad", "cond"))
+
+ggplot(alla) +
+  geom_boxplot(aes(x = type, y = brownheadedcowbird, fill = type)) +
+  scale_fill_manual(values = c("gray", "brown", "yellow"), guide = "none") +
+  facet_wrap(~group) +
   theme_bw() +
-  labs(x = "Observations", y = "Brown-headed Cowbird \nabundance", fill = "") +
-  coord_cartesian(ylim = c(0, 45))
-
-b <- ggplot(all) +
-  geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
-  scale_fill_manual(values = c("gray", "brown", "yellow")) +
-  theme_bw() +
-  labs(x = "Observations", y = "", fill = "") +
-  coord_cartesian(ylim = c(0, 45))
-
-
-ggpubr::ggarrange(a, b, nrow = 1, legend = "none",
-                  labels = "auto", align = "hv")
+  scale_x_discrete(labels = c("Observed", "Traditional \nprediction", "Conditional \nprediction")) +
+  labs(x = "Type", y = "Brown-headed Cowbird \nabundance") +
+  coord_cartesian(ylim = c(0, 65))
+# 
+# a <- ggplot(all1) +
+#   geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
+#   scale_fill_manual(values = c("gray", "brown", "yellow")) +
+#   theme_bw() +
+#   labs(x = "Observations", y = "Brown-headed \nCowbird abundance", fill = "") +
+#   coord_cartesian(ylim = c(0, 45))
+# 
+# b <- ggplot(all) +
+#   geom_boxplot(aes(x = group, y = brownheadedcowbird, fill = group)) +
+#   scale_fill_manual(values = c("gray", "brown", "yellow")) +
+#   theme_bw() +
+#   labs(x = "Observations", y = "", fill = "") +
+#   coord_cartesian(ylim = c(0, 45))
+# 
+# 
+# ggpubr::ggarrange(a, b, nrow = 1, legend = "none",
+#                   labels = "auto", align = "hv")
 
 ggsave(file = "../OUT/figures/predictedAbundance.jpg",
-       height = 5, width = 10)
+       height = 5, width = 11)
 
 
 
