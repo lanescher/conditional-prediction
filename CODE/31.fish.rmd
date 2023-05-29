@@ -308,9 +308,9 @@ full <- full_join(all_is, all_oos, by = c("species", "metric")) %>%
                            name == "mean.y" ~ "Out-of-sample")) 
 
 
-b <- ggplot(full) + 
-  geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
-  geom_hline(yintercept = 0, color = "coral3", alpha = 0.5) +
+b <- ggplot(filter(full, metric == "percDiff")) + 
+  # geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "black", alpha = 0.5) +
   geom_point(aes(x = reorder(Species, abun), y = value, color = metric, shape = name, size = name)) +
   scale_color_manual(#labels = c("% Improvement in RMSPE \nfrom Conditioning",
     #          "Fraction of Predictions\nImproved by Conditioning"),
@@ -326,25 +326,25 @@ b <- ggplot(full) +
                                    size = 9),
         axis.text.y = element_blank(),
         axis.title = element_text(size = 9)) +
-  coord_cartesian(ylim = c(0, 100), clip = "on") +
+  coord_cartesian(ylim = c(0, 25), clip = "on") +
   labs(x = "", y = "")
 
 
 
 
 a <- ggplot() + 
-  geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
-  geom_hline(yintercept = 0, color = "coral3", alpha = 0.5) +
+  # geom_hline(yintercept = 50, color = "deepskyblue", alpha = 0.5) +
+  geom_hline(yintercept = 0, color = "black", alpha = 0.5) +
   geom_boxplot(data = filter(full, metric == "percDiff"),
                aes(x = group, y = value, alpha = name),
                color = "coral3",
                fill = "coral3") +
-  geom_boxplot(data = filter(full, metric == "percImpr"),
-               aes(x = group, y = value, alpha = name),
-               fill = "deepskyblue",
-               color = "deepskyblue") +
+  # geom_boxplot(data = filter(full, metric == "percImpr"),
+  #              aes(x = group, y = value, alpha = name),
+  #              fill = "deepskyblue",
+  #              color = "deepskyblue") +
   scale_alpha_manual(values = c(.6, 0)) +
-  coord_cartesian(ylim = c(0, 100)) +
+  coord_cartesian(ylim = c(0, 25)) +
   theme_bw() +
   theme(strip.background = element_blank(),
         panel.grid.minor = element_blank(),
@@ -355,7 +355,7 @@ a <- ggplot() +
         axis.text.y = element_text(size = 9),
         axis.title = element_text(size = 9),
         legend.position = "none") +
-  labs(x = "", y = "Percent improvement \n in RMSPE (blue) \n \n Percent of \npredictions improved (red)")
+  labs(x = "", y = "Percent improvement \n in RMSPE")
   
 
 
@@ -363,13 +363,13 @@ a <- ggplot() +
 ggpubr::ggarrange(a, b, nrow = 1,
                   labels = "auto",
                   widths = c(0.3, 1),
-                  label.x = c(0.38, 0), label.y = .95,
+                  label.x = c(0.13, 0), label.y = .95,
                   font.label = list(size = 10),
                   align = "h")
 
 
 ggsave(filename = "../OUT/figures/metrics.png",
-       height = 100, width = 180, units = "mm", dpi = 600)
+       height = 110, width = 180, units = "mm", dpi = 600)
 
 ```
 
