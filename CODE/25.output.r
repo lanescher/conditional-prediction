@@ -154,7 +154,7 @@ ggplot(A) +
   labs(x = "", y = "Species \ncoefficient") +
   coord_cartesian(ylim = c(-6.9, 3.3))
 
-ggsave(file = "../OUT/figures/Amatrix.png", height = 60, width = 80,
+ggsave(file = "../OUT/figures/Amatrix.png", height = 70, width = 80,
        units = "mm", dpi = 600)
 
 
