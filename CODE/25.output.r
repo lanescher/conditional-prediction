@@ -98,6 +98,8 @@ figA <- ggplot(A) +
   labs(x = "", y = "Species \ncoefficient") +
   coord_cartesian(ylim = c(-6.9, 3.3))
 
+
+
 figB <- ggplot(A1) +
   geom_abline(intercept = 0, slope = 0) +
   geom_point(aes(x = Species, y = Estimate, color = sigSE)) +
@@ -120,13 +122,39 @@ figB <- ggplot(A1) +
 # combine and plot
 
 ggpubr::ggarrange(figA, figB, nrow = 2,
-                  labels = "auto", 
+                  labels = "auto",
                   common.legend = T, legend = "none",
                   heights = c(1, 1.8),
                   label.x = 0, label.y = 1.04,
                   font.label = list(size = 10))
 
-ggsave(file = "../OUT/figures/Amatrix.png", height = 120, width = 80, 
+ggsave(file = "../OUT/figures/Amatrix.png", height = 120, width = 80,
+       units = "mm", dpi = 600)
+
+
+## now just do a
+
+ggplot(A) +
+  geom_abline(intercept = 0, slope = 0) +
+  geom_point(aes(x = Species, y = Estimate, color = sigSE)) +
+  geom_segment(aes(x = Species, xend = Species,
+                   y = Estimate+SE, yend = Estimate-SE, color = sigSE)) +
+  scale_color_manual(values = c("gray70", "darkblue"), labels = c("Not significant",
+                                                                  "Significant"),
+                     name = "",
+                     guide = "none") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,
+                                   hjust = 1,
+                                   vjust = 0.5,
+                                   size = 7),
+        axis.text = element_text(size = 7),
+        axis.title = element_text(size = 7), 
+        legend.text=element_text(size = 7)) +
+  labs(x = "", y = "Species \ncoefficient") +
+  coord_cartesian(ylim = c(-6.9, 3.3))
+
+ggsave(file = "../OUT/figures/Amatrix.png", height = 60, width = 80,
        units = "mm", dpi = 600)
 
 
@@ -349,30 +377,6 @@ a <- ggplot(rmspeImprovedBy) +
   theme_bw() +
   theme(strip.background = element_blank(),
         panel.grid.minor.x = element_blank(),
-        strip.placement = "outside",
-        axis.text.y = element_text(size = 9),
-        axis.text.x = element_blank(),
-        axis.title = element_text(size = 9),
-        plot.margin = margin(.5,.5,0,.5, "cm")) +
-  labs(x = "", y = "Percent Improvement \nin RMSPE") +
-  scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
-  scale_color_gradientn(values = c(0, 1),
-                        colors = c('blue', "orange"),
-                        guide = "none") +
-  scale_fill_gradientn(values = c(0, 1),
-                       colors = c('blue', "orange"),
-                       guide = "none") +
-  coord_cartesian(clip = "off")
-
-percPredsImproved <- all %>%
-  filter(cat == "frac")
-b <- ggplot(percPredsImproved) +
-  geom_hline(yintercept = 50) +
-  geom_ribbon(aes(x = predOn, ymin = Lo, ymax  = Hi, fill = percZero, group = percZero), alpha = 0.4) +
-  geom_line(aes(x = predOn, y = Mean, color = percZero, group = percZero)) +
-  theme_bw() +
-  theme(strip.background = element_blank(),
-        panel.grid.minor.x = element_blank(),
         #strip.placement = "outside",
         # legend.key.height = unit(.7, "cm"),
         # legend.key.width = unit(.6, "cm"),
@@ -390,7 +394,7 @@ b <- ggplot(percPredsImproved) +
         axis.text = element_text(size = 9),
         axis.title = element_text(size = 9),
         plot.margin = margin(.5,.5,0,.5, "cm")) +
-  labs(x = "Number of species conditioned on", y = "Percent of \npredictions improved", 
+  labs(x = "Number of species conditioned on", y = "Percent improvement \nin RMSPE", 
        color = "Percent non-zero observations") +
   scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
   scale_color_gradientn(values = c(0, 1),
@@ -404,17 +408,57 @@ b <- ggplot(percPredsImproved) +
                        labels = c(0, 25, 50, 75, 100),
                        guide = "none") +
   coord_cartesian(clip = "off")
+# percPredsImproved <- all %>%
+#   filter(cat == "frac")
+# b <- ggplot(percPredsImproved) +
+#   geom_hline(yintercept = 50) +
+#   geom_ribbon(aes(x = predOn, ymin = Lo, ymax  = Hi, fill = percZero, group = percZero), alpha = 0.4) +
+#   geom_line(aes(x = predOn, y = Mean, color = percZero, group = percZero)) +
+#   theme_bw() +
+#   theme(strip.background = element_blank(),
+#         panel.grid.minor.x = element_blank(),
+#         #strip.placement = "outside",
+#         # legend.key.height = unit(.7, "cm"),
+#         # legend.key.width = unit(.6, "cm"),
+#         # legend.title = element_text(size = 9,
+#         #                             hjust = 0.5,
+#         #                             vjust = 1),
+#         legend.key.height = unit(.5, "cm"),
+#         legend.key.width = unit(1.1, "cm"),
+#         legend.title = element_text(size = 9,
+#                                     hjust = 0.5),
+#         legend.direction = "horizontal",
+#         legend.text= element_text(size = 9),
+#         # legend.title = element_text(size = 9),
+#         # legend.text= element_text(size = 9),
+#         axis.text = element_text(size = 9),
+#         axis.title = element_text(size = 9),
+#         plot.margin = margin(.5,.5,0,.5, "cm")) +
+#   labs(x = "Number of species conditioned on", y = "Percent of \npredictions improved", 
+#        color = "Percent non-zero observations") +
+#   scale_x_continuous(breaks = c(1, 5, 10, 15), labels = c(1, 5, 10, 15)) +
+#   scale_color_gradientn(values = c(0, 1),
+#                         colors = c('blue', "orange"), 
+#                         breaks = c(0, 0.25, 0.5, 0.75, 1),
+#                         labels = c(0, 25, 50, 75, 100),
+#                         guide = guide_colorbar(title.position = "top")) +
+#   scale_fill_gradientn(values = c(0, 1),
+#                        colors = c('blue', "orange"), 
+#                        breaks = c(0, 0.25, 0.5, 0.75, 1),
+#                        labels = c(0, 25, 50, 75, 100),
+#                        guide = "none") +
+#   coord_cartesian(clip = "off")
 
 
-ggpubr::ggarrange(a, b, ncol = 1,
+ggpubr::ggarrange(a, ncol = 1,
                   common.legend = T,
                   legend = 'top', 
-                  labels = 'auto',
+                  #labels = 'auto',
                   label.x = 0, label.y = 1.01,
                   font.label = list(size = 10))
 
 
-ggsave(file = "../OUT/figures/conditionOn.png", height = 140, width = 80, 
+ggsave(file = "../OUT/figures/conditionOn.png", height = 90, width = 100, 
        units = "mm", dpi = 600)
 
 
@@ -452,7 +496,19 @@ library(patchwork)
 
 load("X:/conditionalPrediction/OUT/birds-gjamOutput.rdata")
 ydata <- out$inputs$y
+
+percZero <- ydata
+percZero[percZero > 0] <- 1
+percZero <- colMeans(percZero)
+
+
+percZero <- data.frame(species = names(percZero),
+                       percZero = percZero)
+
+
 predSp <- colnames(ydata)
+
+
 
 predsAll <- c()
 for (s in 1:length(predSp)) {
@@ -466,13 +522,25 @@ for (s in 1:length(predSp)) {
   condOn5 <- combn(sp, 5)
 
 
-  for (i in 1:5) {
-    # condition on all species
-    ydataCond <- select(as.data.frame(ydata), !all_of(pred))
-    newdata <- list(ydataCond = ydataCond, nsim = 300)
-    c      <- gjamPredict(out, newdata = newdata)
-    c <- c$sdList$yMu[,pred]
-
+  for (i in 1:2) {
+    
+    if (i == 1) {
+      # condition on all species
+      ydataCond <- select(as.data.frame(ydata), !all_of(pred))
+      newdata <- list(ydataCond = ydataCond, nsim = 300)
+      c      <- gjamPredict(out, newdata = newdata)
+      c <- c$sdList$yMu[,pred]
+      
+      df <- data.frame(species = pred, 
+                       obs = 1:length(c),
+                       combo = i,
+                       count = out$inputs$y[,pred],
+                       name = 'condall',
+                       value = c)
+      
+      predsAll <- bind_rows(predsAll, df)
+    }
+    
     # condition on 5 species
     condOn <- condOn5[,i]
     ydataCond <- select(as.data.frame(ydata), all_of(condOn))
@@ -480,6 +548,14 @@ for (s in 1:length(predSp)) {
     c5      <- gjamPredict(out, newdata = newdata)
     c5 <- c5$sdList$yMu[,pred]
 
+    df <- data.frame(species = pred, 
+                     obs = 1:length(c5),
+                     combo = i,
+                     count = out$inputs$y[,pred],
+                     name = 'cond5',
+                     value = c5)
+    
+    predsAll <- bind_rows(predsAll, df)
 
     # condition on one species
     condOn <- condOn1[,i]
@@ -487,21 +563,38 @@ for (s in 1:length(predSp)) {
     newdata <- list(ydataCond = ydataCond, nsim = 300)
     c1      <- gjamPredict(out, newdata = newdata)
     c1 <- c1$sdList$yMu[,pred]
+    
+    df <- data.frame(species = pred, 
+                     obs = 1:length(c1),
+                     combo = i,
+                     count = out$inputs$y[,pred],
+                     name = 'cond1',
+                     value = c1)
+    
+    predsAll <- bind_rows(predsAll, df)
 
     # traditionanl prediction
     t <- out$prediction$ypredMu[,pred]
 
-    all1 <- data.frame(species = pred,
-                       obs = 1:nrow(out$inputs$y),
-                       combo = i,
-                       count = out$inputs$y[,pred],
-                       trad = t,
-                       cond1 = c1,
-                       cond5 = c5,
-                       condall = c) %>%
-      pivot_longer(cols = c("trad", "cond1", "cond5", "condall"))
+    df <- data.frame(species = pred, 
+                     obs = 1:length(t),
+                     combo = i,
+                     count = out$inputs$y[,pred],
+                     name = 'trad',
+                     value = t)
+    
+    predsAll <- bind_rows(predsAll, df)
+    # all1 <- data.frame(species = pred,
+    #                    obs = 1:nrow(out$inputs$y),
+    #                    combo = i,
+    #                    count = out$inputs$y[,pred],
+    #                    trad = t,
+    #                    cond1 = c1,
+    #                    cond5 = c5,
+    #                    condall = c) %>%
+    #   pivot_longer(cols = c("trad", "cond1", "cond5", "condall"))
 
-    predsAll <- bind_rows(predsAll,  all1)
+    #predsAll <- bind_rows(predsAll,  all1)
   }
 
 }
@@ -524,8 +617,9 @@ all1 <- predsAll %>%
 
 # get % obs improved for obs = 0 and obs > 0
 percImpr <- c()
-for (s in 1:length(colnames(ydata))) {
-  sp <- colnames(ydata)[s]
+for (s in 1:length(predSp)) {
+  #sp <- colnames(ydata)[s]
+  sp <- predSp[s]
   
   tmp <- all1 %>%
     filter(species == sp) %>%
@@ -539,6 +633,7 @@ for (s in 1:length(colnames(ydata))) {
                               T ~ 0)) %>%
     group_by(name, combo) %>%
     summarize(percImpr = mean(better)) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percImprSe = sd(percImpr)/sqrt(5),
               percImpr = mean(percImpr)) %>%
@@ -560,6 +655,7 @@ for (s in 1:length(colnames(ydata))) {
                               T ~ 0)) %>%
     group_by(name, combo) %>%
     summarize(percImpr = mean(better)) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percImprSe = sd(percImpr)/sqrt(5),
               percImpr = mean(percImpr)) %>%
@@ -581,6 +677,7 @@ for (s in 1:length(colnames(ydata))) {
                               T ~ 0)) %>%
     group_by(name, combo) %>%
     summarize(percImpr = mean(better)) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percImprSe = sd(percImpr)/sqrt(5),
               percImpr = mean(percImpr)) %>%
@@ -594,8 +691,9 @@ for (s in 1:length(colnames(ydata))) {
 
 # get rmspes for when obs = 0 and obs > 0
 rmspes <- c()
-for (s in 1:length(colnames(ydata))) {
-  sp <- colnames(ydata)[s]
+for (s in 1:length(predSp)) {
+  #sp <- colnames(ydata)[s]
+  sp <- predSp[s]
   
   tmp <- all1 %>%
     filter(species == sp,
@@ -606,6 +704,7 @@ for (s in 1:length(colnames(ydata))) {
     pivot_wider(values_from = rmspe, names_from = name) %>%
     pivot_longer(!c("trad", "combo")) %>%
     mutate(percDiff = (trad-value)/trad * 100) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percDiffSe = sd(percDiff)/sqrt(5),
               percDiff = mean(percDiff)) %>%
@@ -623,6 +722,7 @@ for (s in 1:length(colnames(ydata))) {
     pivot_wider(values_from = rmspe, names_from = name) %>%
     pivot_longer(!c("trad", "combo")) %>%
     mutate(percDiff = (trad-value)/trad * 100) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percDiffSe = sd(percDiff)/sqrt(5),
               percDiff = mean(percDiff)) %>%
@@ -639,6 +739,7 @@ for (s in 1:length(colnames(ydata))) {
     pivot_wider(values_from = rmspe, names_from = name) %>%
     pivot_longer(!c("trad", "combo")) %>%
     mutate(percDiff = (trad-value)/trad * 100) %>%
+    filter((name == "condall" & combo > 1) == F) %>%
     group_by(name) %>%
     summarize(percDiffSe = sd(percDiff)/sqrt(5),
               percDiff = mean(percDiff)) %>%
@@ -650,20 +751,21 @@ for (s in 1:length(colnames(ydata))) {
 
 }
 #colnames(rmspes) <- c("species", "trad", "cond1", "cond5", 'condall', "group")
-
-percZero <- ydata
-percZero[percZero > 0] <- 1
-percZero <- colMeans(percZero)
-
-
-percZero <- data.frame(species = names(percZero),
-                       percZero = percZero)
-
+# 
+# percZero <- ydata
+# percZero[percZero > 0] <- 1
+# percZero <- colMeans(percZero)
+# 
+# 
+# percZero <- data.frame(species = names(percZero),
+#                        percZero = percZero)
+# 
 
 rmspes1 <- rmspes %>%
-  inner_join(percZero, by = "species")
+  inner_join(percZero, by = "species") %>%
+  mutate(percZero = percZero*100)
 
-a <- ggplot(rmspes1) +
+a <- ggplot(filter(rmspes1, group == "All")) +
   geom_hline(yintercept = 0) +
   geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
                   ymax = percDiff + percDiffSe, 
@@ -671,22 +773,68 @@ a <- ggplot(rmspes1) +
                   fill = percZero), alpha = 0.4) +
   geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
                 y = percDiff, color = percZero, group = species)) +
-  facet_wrap(~group, scales = "free") +
+  #facet_wrap(~group, scales = "free") +
   scale_x_discrete(labels = c("1", "5", "16")) +
   scale_color_gradientn(values = c(0, 1),
                         colors = c('blue', "orange")) +
   scale_fill_gradientn(values = c(0, 1),
                        colors = c('blue', "orange"), guide = "none") +
   theme_bw() +
-  theme() +
+  theme(axis.text.x = element_blank()) +
   labs(x = "", y = "Percent improvement \nin RMSPE", 
-       color = "Percent \nnon-zero \nobservations") +
+       color = "Percent \nnon-zero \nobservations",
+       title = "All") +
+  coord_cartesian(ylim = c(-27, 50))
+
+b <- ggplot(filter(rmspes1, group == "Count = 0")) +
+  geom_hline(yintercept = 0) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = percDiff + percDiffSe, 
+                  ymin = percDiff - percDiffSe, group = species,
+                  fill = percZero), alpha = 0.4) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percDiff, color = percZero, group = species)) +
+  #facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  labs(x = "", y = "", 
+       color = "Percent \nnon-zero \nobservations",
+       title = "Focal species absent") +
+  coord_cartesian(ylim = c(-27, 50))
+
+c <- ggplot(filter(rmspes1, group == "Count > 0")) +
+  geom_hline(yintercept = 0) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = percDiff + percDiffSe, 
+                  ymin = percDiff - percDiffSe, group = species,
+                  fill = percZero), alpha = 0.4) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percDiff, color = percZero, group = species)) +
+  #facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank()) +
+  labs(x = "", y = "", 
+       color = "Percent \nnon-zero \nobservations",
+       title = "Focal species present") +
   coord_cartesian(ylim = c(-27, 50))
 
 
 percImpr1 <- percImpr %>%
-  inner_join(percZero, by = "species")
-b <- ggplot(percImpr1) +
+  inner_join(percZero, by = "species") %>%
+  mutate(percZero = percZero*100)
+d <- ggplot(filter(percImpr1, group == "All")) +
   geom_hline(yintercept = 50) +
   geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
                   ymax = (percImpr + percImprSe)*100, 
@@ -696,7 +844,7 @@ b <- ggplot(percImpr1) +
   #                y = percImpr, color = percZero)) +
   geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
                 y = percImpr*100, color = percZero, group = species)) +
-  facet_wrap(~group, scales = "free") +
+  #facet_wrap(~group, scales = "free") +
   scale_x_discrete(labels = c("1", "5", "16")) +
   scale_color_gradientn(values = c(0, 1),
                         colors = c('blue', "orange")) +
@@ -704,11 +852,58 @@ b <- ggplot(percImpr1) +
                         colors = c('blue', "orange"), guide = "none") +
   theme_bw() +
   theme() +
-  labs(x = "Number of species conditioned on", y = "Percent of \npredictions improved", 
-       color = "Percent \nnon-zero \nobservations") +
+  labs(x = "", y = "Percent of \npredictions improved", 
+       color = "Percent \nnon-zero \nobservations",
+       title = "All") +
   coord_cartesian(ylim = c(0, 100))
 
-ggpubr::ggarrange(a, b, nrow = 2, common.legend = T, legend = "right")
+e <- ggplot(filter(percImpr1, group == "Count = 0")) +
+  geom_hline(yintercept = 50) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = (percImpr + percImprSe)*100, 
+                  ymin = (percImpr - percImprSe)*100, group = species,
+                  fill = percZero), alpha = 0.4) +
+  # geom_point(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+  #                y = percImpr, color = percZero)) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percImpr*100, color = percZero, group = species)) +
+  #facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme(axis.text.y = element_blank()) +
+  labs(x = "Number of species conditioned on", y = "", 
+       color = "Percent \nnon-zero \nobservations",
+       title = "Focal species absent") +
+  coord_cartesian(ylim = c(0, 100))
+
+f <- ggplot(filter(percImpr1, group == "Count > 0")) +
+  geom_hline(yintercept = 50) +
+  geom_ribbon(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                  ymax = (percImpr + percImprSe)*100, 
+                  ymin = (percImpr - percImprSe)*100, group = species,
+                  fill = percZero), alpha = 0.4) +
+  # geom_point(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+  #                y = percImpr, color = percZero)) +
+  geom_line(aes(x = factor(name, levels = c('cond1', "cond5", "condall")),
+                y = percImpr*100, color = percZero, group = species)) +
+  #facet_wrap(~group, scales = "free") +
+  scale_x_discrete(labels = c("1", "5", "16")) +
+  scale_color_gradientn(values = c(0, 1),
+                        colors = c('blue', "orange")) +
+  scale_fill_gradientn(values = c(0, 1),
+                       colors = c('blue', "orange"), guide = "none") +
+  theme_bw() +
+  theme(axis.text.y = element_blank()) +
+  labs(x = "", y = "", 
+       color = "Percent \nnon-zero \nobservations",
+       title = "Focal species present") +
+  coord_cartesian(ylim = c(0, 100))
+
+ggpubr::ggarrange(a, b, c, d, e, f, labels = "auto", common.legend = T, legend = "right")
 
 
 
